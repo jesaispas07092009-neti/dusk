@@ -1,0 +1,107 @@
+/* ═══════════════════════════════════════════════════════════
+   DUSK — widgets.css
+═══════════════════════════════════════════════════════════ */
+.widget {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: default;
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    box-shadow   var(--duration-base) var(--ease-dusk),
+    transform    var(--duration-base) var(--ease-dusk),
+    border-color var(--duration-base) var(--ease-dusk);
+}
+.widget.is-visible {
+  animation: widget-appear var(--duration-slow) var(--ease-emerge) both;
+}
+@keyframes widget-appear {
+  from { opacity:0; transform:translateY(10px) scale(0.99); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+
+.widget--expandable:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+  cursor: pointer;
+}
+.widget--expandable:hover .widget-expand-btn { opacity: 1; }
+.widget--expandable:active { transform: translateY(0) scale(0.995); transition-duration: var(--duration-fast); }
+
+.widget-inner {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, var(--color-surface-2) 0%, var(--color-surface) 100%);
+  border: 1px solid var(--color-border);
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), var(--shadow-widget);
+}
+.widget-inner::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 40%; height: 40%;
+  background: radial-gradient(ellipse at 100% 0%, var(--color-amber-glow) 0%, transparent 70%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  flex-shrink: 0;
+}
+.widget-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.widget-expand-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-dusk), color var(--duration-fast) var(--ease-dusk), background-color var(--duration-fast) var(--ease-dusk);
+  flex-shrink: 0;
+}
+.widget-expand-btn:hover { color: var(--color-amber-light); background-color: var(--color-amber-dim); }
+.widget-expand-btn svg { width: 13px; height: 13px; stroke-width: 2; }
+
+.widget-body {
+  flex: 1;
+  padding: 0 var(--space-5) var(--space-5);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.widget-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-faint);
+  transition: border-color var(--duration-base) var(--ease-dusk);
+}
+.widget:hover .widget-placeholder { border-color: var(--color-border-warm); }
+.widget-placeholder svg { width: 20px; height: 20px; stroke-width: 1.5; color: var(--color-text-faint); transition: color var(--duration-base) var(--ease-dusk); }
+.widget:hover .widget-placeholder svg { color: var(--color-amber); }
+.widget-placeholder p { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); transition: color var(--duration-base) var(--ease-dusk); }
+.widget:hover .widget-placeholder p { color: var(--color-text-muted); }
+
+.widget--large  { border-bottom-left-radius: var(--radius-sm); border-bottom-right-radius: var(--radius-sm); }
+.widget--small  { border-radius: var(--radius-md); }
+.widget--wide   { border-radius: var(--radius-sm); }

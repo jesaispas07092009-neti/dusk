@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dusk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dusk</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+  <link rel="stylesheet" href="assets/css/main.css" />
+  <link rel="stylesheet" href="assets/css/layout.css" />
+  <link rel="stylesheet" href="assets/css/widgets.css" />
+  <link rel="stylesheet" href="assets/css/modal.css" />
+  <link rel="stylesheet" href="assets/css/widget-contents.css" />
+  <link rel="stylesheet" href="assets/css/auth.css" />
+</head>
+<body>
+  <div class="bg-grain" aria-hidden="true"></div>
+
+  <header class="dusk-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <span class="brand-name">Dusk</span>
+      </div>
+      <nav class="header-nav" aria-label="Navigation principale">
+        <span class="nav-time" id="live-time" aria-live="polite">--:--</span>
+        <button class="nav-btn" aria-label="Paramètres" id="btn-settings">
+          <i data-lucide="sliders-horizontal"></i>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="dusk-main" role="main">
+    <div id="dusk-grid"></div>
+  </main>
+
+  <div
+    class="dusk-modal"
+    id="dusk-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Widget en plein écran"
+    aria-hidden="true"
+  >
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-container" id="modal-container">
+      <header class="modal-header">
+        <span class="modal-title" id="modal-title">Widget</span>
+        <button class="modal-close-btn" id="modal-close" aria-label="Fermer">
+          <i data-lucide="x"></i>
+        </button>
+      </header>
+      <div class="modal-content" id="modal-content"></div>
+    </div>
+  </div>
+
+  <div id="auth-root"></div>
+  <div id="settings-root"></div>
+
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
