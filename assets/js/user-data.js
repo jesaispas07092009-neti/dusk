@@ -26,11 +26,11 @@ const DEFAULT_LINKS = [
 ];
 
 const DEFAULT_PROJECTS = [
-  { name: 'Dusk', desc: 'Dashboard personnel immersif', status: 'actif', color: '#c8813c', position: 0 },
-  { name: 'Nocturne', desc: 'App de journaling nocturne', status: 'en pause', color: '#4a7ab5', position: 1 },
-  { name: 'Ombra', desc: 'Système de design sombre', status: 'concept', color: '#8b5cf6', position: 2 },
-  { name: 'Solstice', desc: 'Calendrier lunaire interactif', status: 'terminé', color: '#4a8f7a', position: 3 },
-  { name: 'Vesper', desc: 'Player audio minimaliste', status: 'idée', color: '#7a7067', position: 4 },
+  { name: 'Dusk', description: 'Dashboard personnel immersif', status: 'actif', color: '#c8813c', position: 0 },
+  { name: 'Nocturne', description: 'App de journaling nocturne', status: 'en pause', color: '#4a7ab5', position: 1 },
+  { name: 'Ombra', description: 'Système de design sombre', status: 'concept', color: '#8b5cf6', position: 2 },
+  { name: 'Solstice', description: 'Calendrier lunaire interactif', status: 'terminé', color: '#4a8f7a', position: 3 },
+  { name: 'Vesper', description: 'Player audio minimaliste', status: 'idée', color: '#7a7067', position: 4 },
 ];
 
 const DEFAULT_WIDGET_IDS = [
@@ -44,24 +44,24 @@ function storageKey(name, userId = 'anon') {
   return `${STORAGE_PREFIX}:${name}:${userId}`;
 }
 
-function readLocal(name, fallback) {
+function readLocal(name, userId = 'anon', fallback) {
   try {
-    const raw = localStorage.getItem(storageKey(name));
+    const raw = localStorage.getItem(storageKey(name, userId));
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
   }
 }
 
-function writeLocal(name, value) {
+function writeLocal(name, userId = 'anon', value) {
   try {
-    localStorage.setItem(storageKey(name), JSON.stringify(value));
+    localStorage.setItem(storageKey(name, userId), JSON.stringify(value));
   } catch {}
 }
 
-
 function isUuidLike(value) {
-  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function normalizeProfile(profile, fallbackUserId = null, email = null) {
@@ -81,6 +81,18 @@ function normalizeProfile(profile, fallbackUserId = null, email = null) {
   };
 }
 
+function normalizeProject(project, position = 0, userId = null) {
+  return {
+    id: project.id ?? `${userId}:project:${position}`,
+    user_id: project.user_id ?? userId,
+    name: project.name ?? '',
+    description: project.description ?? project.desc ?? '',
+    status: project.status ?? 'concept',
+    color: project.color ?? '#c8813c',
+    position: Number.isFinite(project.position) ? project.position : position,
+  };
+}
+
 function buildDefaultWidgetPrefs(userId) {
   return DEFAULT_WIDGET_IDS.map((widget_id, position) => ({
     id: `${userId}:${widget_id}`,
@@ -91,20 +103,30 @@ function buildDefaultWidgetPrefs(userId) {
   }));
 }
 
-async function fetchSingle(table, key = 'user_id', value) {
-  if (!supabase) return { data: null, error: null };
-  const { data, error } = await supabase.from(table).select('*').eq(key, value);
-  return { data: data || [], error };
+function persistFallbackState({ profile, todos, links, projects, widgetPrefs, moodLog } = {}, userId = 'anon') {
+  if (profile) writeLocal('profile', userId, profile);
+  if (todos) writeLocal('todos', userId, todos);
+  if (links) writeLocal('links', userId, links);
+  if (projects) writeLocal('projects', userId, projects);
+  if (widgetPrefs) writeLocal('widget-prefs', userId, widgetPrefs);
+  if (moodLog) writeLocal('mood-log', userId, moodLog);
 }
 
 export async function loadDashboardData({ userId = null, email = null } = {}) {
+  const storageUserId = userId || 'anon';
+
   if (!isSupabaseConfigured || !supabase || !userId) {
-    const profile = normalizeProfile(readLocal('profile', null), userId, email);
-    const todos = readLocal('todos', []);
-    const links = readLocal('links', DEFAULT_LINKS);
-    const projects = readLocal('projects', DEFAULT_PROJECTS);
-    const widgetPrefs = readLocal('widget-prefs', buildDefaultWidgetPrefs(userId || 'anon'));
-    const moodLog = readLocal('mood-log', []);
+    const profile = normalizeProfile(readLocal('profile', storageUserId, null), userId, email);
+    const todos = readLocal('todos', storageUserId, []);
+    const links = (readLocal('links', storageUserId, DEFAULT_LINKS) || []).map((link, position) => ({
+      ...link,
+      position: link.position ?? position,
+    }));
+    const projects = (readLocal('projects', storageUserId, DEFAULT_PROJECTS) || []).map((project, position) =>
+      normalizeProject(project, position, storageUserId)
+    );
+    const widgetPrefs = readLocal('widget-prefs', storageUserId, buildDefaultWidgetPrefs(storageUserId));
+    const moodLog = readLocal('mood-log', storageUserId, []);
     return { profile, todos, links, projects, widgetPrefs, moodLog, mood: moodLog[0] || null };
   }
 
@@ -118,34 +140,32 @@ export async function loadDashboardData({ userId = null, email = null } = {}) {
   ]);
 
   const profile = normalizeProfile(profileRes.data, userId, email);
+
   const widgetPrefs = (prefsRes.data && prefsRes.data.length ? prefsRes.data : buildDefaultWidgetPrefs(userId)).map((pref, index) => ({
     ...pref,
     position: Number.isFinite(pref.position) ? pref.position : index,
   }));
 
   const todos = (todosRes.data || []).map(todo => ({ ...todo }));
+
   const links = (linksRes.data && linksRes.data.length ? linksRes.data : DEFAULT_LINKS.map((link, position) => ({
     id: `${userId}:link:${position}`,
     user_id: userId,
     ...link,
-  }))).map((link, position) => ({ ...link, position: link.position ?? position }));
+  }))).map((link, position) => ({
+    ...link,
+    position: link.position ?? position,
+  }));
+
   const projects = (projectsRes.data && projectsRes.data.length ? projectsRes.data : DEFAULT_PROJECTS.map((project, position) => ({
     id: `${userId}:project:${position}`,
     user_id: userId,
     ...project,
-  }))).map((project, position) => ({ ...project, position: project.position ?? position }));
+  }))).map((project, position) => normalizeProject(project, position, userId));
+
   const moodLog = (moodRes.data || []).map(entry => ({ ...entry }));
 
   return { profile, todos, links, projects, widgetPrefs, moodLog, mood: moodLog[0] || null };
-}
-
-export function persistFallbackState({ profile, todos, links, projects, widgetPrefs, moodLog } = {}) {
-  if (profile) writeLocal('profile', profile);
-  if (todos) writeLocal('todos', todos);
-  if (links) writeLocal('links', links);
-  if (projects) writeLocal('projects', projects);
-  if (widgetPrefs) writeLocal('widget-prefs', widgetPrefs);
-  if (moodLog) writeLocal('mood-log', moodLog);
 }
 
 export async function saveProfile(userId, patch) {
@@ -153,7 +173,7 @@ export async function saveProfile(userId, patch) {
   const next = normalizeProfile({ ...current, ...patch }, userId, state.get('user.email'));
 
   if (!isSupabaseConfigured || !supabase || !userId) {
-    persistFallbackState({ profile: next });
+    persistFallbackState({ profile: next }, userId || 'anon');
     return next;
   }
 
@@ -174,7 +194,7 @@ export async function saveProfile(userId, patch) {
 
 export async function saveWidgetPrefs(userId, prefs) {
   if (!isSupabaseConfigured || !supabase || !userId) {
-    persistFallbackState({ widgetPrefs: prefs });
+    persistFallbackState({ widgetPrefs: prefs }, userId || 'anon');
     return prefs;
   }
 
@@ -192,7 +212,7 @@ export async function saveWidgetPrefs(userId, prefs) {
 
 export async function saveTodos(userId, todos) {
   if (!isSupabaseConfigured || !supabase || !userId) {
-    persistFallbackState({ todos });
+    persistFallbackState({ todos }, userId || 'anon');
     return todos;
   }
 
@@ -211,7 +231,7 @@ export async function saveTodos(userId, todos) {
 
 export async function saveLinks(userId, links) {
   if (!isSupabaseConfigured || !supabase || !userId) {
-    persistFallbackState({ links });
+    persistFallbackState({ links }, userId || 'anon');
     return links;
   }
 
@@ -231,7 +251,7 @@ export async function saveLinks(userId, links) {
 
 export async function saveProjects(userId, projects) {
   if (!isSupabaseConfigured || !supabase || !userId) {
-    persistFallbackState({ projects });
+    persistFallbackState({ projects }, userId || 'anon');
     return projects;
   }
 
@@ -239,7 +259,7 @@ export async function saveProjects(userId, projects) {
     id: isUuidLike(project.id) ? project.id : undefined,
     user_id: userId,
     name: project.name,
-    description: project.description,
+    description: project.description ?? project.desc ?? '',
     status: project.status,
     color: project.color,
     position: Number.isFinite(project.position) ? project.position : index,
@@ -252,8 +272,8 @@ export async function saveProjects(userId, projects) {
 
 export async function saveMood(userId, moodEntry) {
   if (!isSupabaseConfigured || !supabase || !userId) {
-    const moodLog = [moodEntry, ...readLocal('mood-log', [])].slice(0, 20);
-    persistFallbackState({ moodLog });
+    const moodLog = [moodEntry, ...readLocal('mood-log', userId || 'anon', [])].slice(0, 20);
+    persistFallbackState({ moodLog }, userId || 'anon');
     return moodEntry;
   }
 
@@ -271,8 +291,8 @@ export async function saveMood(userId, moodEntry) {
 
 export async function deleteTodo(userId, todoId) {
   if (!isSupabaseConfigured || !supabase || !userId) {
-    const todos = readLocal('todos', []).filter(todo => todo.id !== todoId);
-    persistFallbackState({ todos });
+    const todos = readLocal('todos', userId || 'anon', []).filter(todo => todo.id !== todoId);
+    persistFallbackState({ todos }, userId || 'anon');
     return todos;
   }
 
