@@ -1,6 +1,8 @@
 /* ── Widget : Projets ────────────────────────────────────── */
 import { state } from '../state.js';
-import { getDefaultProjects, saveProjects } from '../user-data.js';
+import { deleteProject, getDefaultProjects, saveProjects } from '../user-data.js';
+import { persistMutation } from '../lib/persist.js';
+import { renderGrid } from '../grid.js';
 import { esc } from '../utils/escape.js';
 
 const STATUS_COLORS = {
@@ -18,7 +20,11 @@ function getProjects() {
 }
 
 function setProjects(next) {
-  state.set('user.projects', next);
+  state.set('user.projects', next.map(project => ({ ...project })));
+}
+
+function cloneProjects(projects) {
+  return projects.map(project => ({ ...project }));
 }
 
 function statusColor(s) {
@@ -53,20 +59,40 @@ export const projectsWidget = {
   },
 
   renderDetail(container) {
-    let projects = [...getProjects()];
+    let projects = cloneProjects(getProjects());
+    let syncMessage = '';
+    let syncError = false;
+    let statusTimer = null;
 
-    function persist() {
-      setProjects(projects);
-      saveProjects(state.get('user.id'), projects).catch(() => {});
+    function setStatus(message = '', error = false, autoClear = false) {
+      syncMessage = message;
+      syncError = error;
+
+      if (statusTimer) {
+        clearTimeout(statusTimer);
+        statusTimer = null;
+      }
+
+      if (autoClear && message) {
+        statusTimer = setTimeout(() => {
+          if (!container.isConnected) return;
+          syncMessage = '';
+          syncError = false;
+          redraw();
+        }, 2000);
+      }
     }
 
     function redraw() {
-      persist();
       container.innerHTML = `
         <div style="max-width:640px;margin:0 auto">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-5)">
             <div style="font-family:var(--font-display);font-size:var(--text-xl);color:var(--color-text)">Mes projets</div>
             <button class="todo-add-btn" id="proj-new">+ Nouveau</button>
+          </div>
+
+          <div id="proj-sync-status" style="margin-bottom:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:${syncError ? '#c84a4a' : 'var(--color-text-faint)'}">
+            ${esc(syncMessage)}
           </div>
 
           <div id="proj-form" style="display:none;margin-bottom:var(--space-5);padding:var(--space-4);border-radius:var(--radius-md);background:var(--color-surface-2);border:1px solid var(--color-border)">
@@ -109,38 +135,82 @@ export const projectsWidget = {
           </div>
         </div>`;
 
+      const status = container.querySelector('#proj-sync-status');
+      const form = container.querySelector('#proj-form');
+
       container.querySelector('#proj-new').addEventListener('click', () => {
-        const form = container.querySelector('#proj-form');
         form.style.display = form.style.display === 'none' ? 'block' : 'none';
       });
 
       container.querySelector('#proj-cancel').addEventListener('click', () => {
-        container.querySelector('#proj-form').style.display = 'none';
+        form.style.display = 'none';
       });
 
-      container.querySelector('#proj-save').addEventListener('click', () => {
+      async function persistProjects(nextProjects, action, successMessage = 'Sauvegardé') {
+        const previous = cloneProjects(projects);
+        projects = cloneProjects(nextProjects);
+        setProjects(projects);
+        setStatus('Sauvegarde…');
+        renderGrid();
+        redraw();
+
+        try {
+          await persistMutation({
+            action,
+            rollback: () => {
+              projects = cloneProjects(previous);
+              setProjects(previous);
+            },
+            errorMessage: 'Impossible de sauvegarder les projets.',
+          });
+          setStatus(successMessage, false, true);
+          renderGrid();
+          redraw();
+        } catch (err) {
+          console.error('Projects save failed:', err);
+          setStatus('Erreur de sauvegarde', true);
+          renderGrid();
+          redraw();
+        }
+      }
+
+      container.querySelector('#proj-save').addEventListener('click', async () => {
         const name = container.querySelector('#proj-name').value.trim();
         if (!name) return;
-        const status = container.querySelector('#proj-status').value;
+        const statusValue = container.querySelector('#proj-status').value;
         const desc = container.querySelector('#proj-desc').value.trim();
-        projects = [...projects, { id: crypto.randomUUID?.() || String(Date.now()), name, description: desc, status, color: statusColor(status), position: projects.length }];
-        redraw();
+        const next = [
+          ...projects,
+          {
+            id: crypto.randomUUID?.() || String(Date.now()),
+            name,
+            description: desc,
+            status: statusValue,
+            color: statusColor(statusValue),
+            position: projects.length,
+          },
+        ];
+        form.style.display = 'none';
+        await persistProjects(next, () => saveProjects(state.get('user.id'), next), 'Projet ajouté');
       });
 
       container.querySelectorAll('[data-proj-status]').forEach(sel => {
-        sel.addEventListener('change', e => {
+        sel.addEventListener('change', async e => {
           e.stopPropagation();
           const idx = Number(sel.dataset.projStatus);
-          projects[idx] = { ...projects[idx], status: sel.value, color: statusColor(sel.value) };
-          redraw();
+          const next = cloneProjects(projects);
+          next[idx] = { ...next[idx], status: sel.value, color: statusColor(sel.value) };
+          await persistProjects(next, () => saveProjects(state.get('user.id'), next), 'Statut mis à jour');
         });
       });
 
       container.querySelectorAll('[data-del-proj]').forEach(el => {
-        el.addEventListener('click', e => {
+        el.addEventListener('click', async e => {
           e.stopPropagation();
-          projects.splice(Number(el.dataset.delProj), 1);
-          redraw();
+          const idx = Number(el.dataset.delProj);
+          const removed = projects[idx];
+          const next = projects.filter((_, i) => i !== idx);
+          await persistProjects(next, () => deleteProject(state.get('user.id'), removed.id), 'Projet supprimé');
         });
       });
     }
