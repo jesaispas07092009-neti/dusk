@@ -1,6 +1,7 @@
 /* ── Widget : Projets ────────────────────────────────────── */
-import { state }                        from '../state.js';
+import { state } from '../state.js';
 import { getDefaultProjects, saveProjects } from '../user-data.js';
+import { esc } from '../utils/escape.js';
 
 const STATUS_COLORS = {
   'actif':    '#c8813c',
@@ -24,6 +25,12 @@ function statusColor(s) {
   return STATUS_COLORS[s] || '#c8813c';
 }
 
+function safeColor(value, fallback) {
+  const s = String(value ?? '').trim();
+  if (/^#[0-9a-fA-F]{3,8}$/.test(s)) return s;
+  return fallback;
+}
+
 export const projectsWidget = {
   id:    'projects',
   label: 'Projets',
@@ -35,12 +42,12 @@ export const projectsWidget = {
       <div class="wc-fill" style="gap:var(--space-2)">
         ${projects.slice(0, 3).map(p => `
           <div class="project-item">
-            <div class="project-dot" style="background:${p.color || statusColor(p.status)}"></div>
+            <div class="project-dot" style="background:${safeColor(p.color, statusColor(p.status))}"></div>
             <div>
-              <div class="project-name">${p.name}</div>
-              <div class="project-desc">${p.description || p.desc || ''}</div>
+              <div class="project-name">${esc(p.name)}</div>
+              <div class="project-desc">${esc(p.description || p.desc || '')}</div>
             </div>
-            <span class="project-status" style="background:${statusColor(p.status)}20;color:${statusColor(p.status)};border:1px solid ${statusColor(p.status)}40">${p.status}</span>
+            <span class="project-status" style="background:${statusColor(p.status)}20;color:${statusColor(p.status)};border:1px solid ${statusColor(p.status)}40">${esc(p.status)}</span>
           </div>`).join('')}
       </div>`;
   },
@@ -71,7 +78,7 @@ export const projectsWidget = {
               <label style="display:grid;gap:var(--space-1)">
                 <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint)">Statut</span>
                 <select id="proj-status" style="background:var(--color-surface-3);border:1px solid var(--color-border);border-radius:12px;padding:0.6rem 0.8rem;color:var(--color-text);font:inherit;width:100%">
-                  ${STATUS_LIST.map(s => `<option value="${s}">${s}</option>`).join('')}
+                  ${STATUS_LIST.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}
                 </select>
               </label>
             </div>
@@ -88,14 +95,14 @@ export const projectsWidget = {
           <div class="projects-list">
             ${projects.map((p, i) => `
               <div class="project-item" data-proj="${i}">
-                <div class="project-dot" style="background:${p.color || statusColor(p.status)};width:10px;height:10px;margin-top:5px"></div>
+                <div class="project-dot" style="background:${safeColor(p.color, statusColor(p.status))};width:10px;height:10px;margin-top:5px"></div>
                 <div style="flex:1">
-                  <div class="project-name" style="font-size:var(--text-base)">${p.name}</div>
-                  <div class="project-desc" style="margin-top:var(--space-1)">${p.description || p.desc || ''}</div>
+                  <div class="project-name" style="font-size:var(--text-base)">${esc(p.name)}</div>
+                  <div class="project-desc" style="margin-top:var(--space-1)">${esc(p.description || p.desc || '')}</div>
                 </div>
                 <select class="proj-status-select" data-proj-status="${i}"
                   style="background:${statusColor(p.status)}15;color:${statusColor(p.status)};border:1px solid ${statusColor(p.status)}40;border-radius:999px;padding:4px 10px;font-family:var(--font-mono);font-size:var(--text-xs);cursor:pointer">
-                  ${STATUS_LIST.map(s => `<option value="${s}" ${s === p.status ? 'selected' : ''}>${s}</option>`).join('')}
+                  ${STATUS_LIST.map(s => `<option value="${esc(s)}" ${s === p.status ? 'selected' : ''}>${esc(s)}</option>`).join('')}
                 </select>
                 <span data-del-proj="${i}" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);cursor:pointer;margin-left:var(--space-2);padding:4px 8px">×</span>
               </div>`).join('')}
