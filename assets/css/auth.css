@@ -16,8 +16,9 @@
   position: absolute;
   inset: 0;
   background: rgba(7, 6, 5, 0.72);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--blur-intensity, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-intensity, 12px));
+  transition: backdrop-filter 600ms var(--ease-dusk);
 }
 
 .auth-card,
@@ -29,12 +30,16 @@
   width: min(92vw, 560px);
   max-height: min(88vh, 760px);
   overflow: auto;
-  background: linear-gradient(180deg, rgba(24, 22, 20, 0.98), rgba(15, 14, 13, 0.98));
+  background: linear-gradient(180deg, var(--color-surface-2) 0%, var(--color-surface) 100%);
   border: 1px solid var(--color-border);
   border-radius: 24px;
   box-shadow: var(--shadow-modal);
   padding: var(--space-6);
   color: var(--color-text);
+  transition:
+    background 600ms var(--ease-dusk),
+    border-color 400ms var(--ease-dusk),
+    box-shadow 400ms var(--ease-dusk);
 }
 
 .settings-panel {
@@ -106,12 +111,16 @@
   color: var(--color-text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
+  transition:
+    background-color 200ms var(--ease-dusk),
+    border-color     200ms var(--ease-dusk),
+    color            200ms var(--ease-dusk);
 }
 
 .auth-tab.active,
 .settings-tab.active {
-  background: rgba(200, 129, 60, 0.16);
-  border-color: rgba(200, 129, 60, 0.32);
+  background: var(--color-accent-dim);
+  border-color: var(--color-border-warm);
   color: var(--color-text);
 }
 
@@ -154,6 +163,17 @@
   padding: 0.9rem 1rem;
   color: var(--color-text);
   font: inherit;
+  transition:
+    border-color     200ms var(--ease-dusk),
+    background-color 200ms var(--ease-dusk);
+}
+
+.auth-field input:focus,
+.settings-field input:focus,
+.settings-field textarea:focus {
+  border-color: var(--color-border-warm);
+  background: rgba(255,255,255,0.035);
+  outline: none;
 }
 
 .settings-field--full {
@@ -176,13 +196,23 @@
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   border: 1px solid var(--color-border);
+  transition:
+    background-color 200ms var(--ease-dusk),
+    border-color     200ms var(--ease-dusk),
+    opacity          200ms var(--ease-dusk);
 }
 
 .auth-submit,
 .settings-primary {
-  background: rgba(200, 129, 60, 0.16);
+  background: var(--color-accent-dim);
   color: var(--color-text);
-  border-color: rgba(200, 129, 60, 0.34);
+  border-color: var(--color-border-warm);
+}
+
+.auth-submit:hover,
+.settings-primary:hover {
+  background: rgba(var(--color-accent), 0.22);
+  opacity: 0.9;
 }
 
 .settings-danger {
@@ -234,6 +264,116 @@
   color: var(--color-text);
 }
 
+/* ── Theme Picker — Onglet Ambiance ──────────────────────────── */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    border-color 200ms var(--ease-dusk),
+    transform    200ms var(--ease-emerge),
+    box-shadow   200ms var(--ease-dusk);
+  overflow: hidden;
+}
+
+.theme-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  border-color: var(--color-border-warm);
+}
+
+.theme-card:active {
+  transform: translateY(0);
+  transition-duration: 80ms;
+}
+
+.theme-card--active {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 1px var(--color-accent), 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.theme-card__preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+}
+
+.theme-card__surface {
+  height: 22px;
+  border-radius: 6px;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.theme-card__surface--2 {
+  height: 14px;
+  width: 70%;
+  opacity: 0.6;
+}
+
+.theme-card__dot {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.theme-card__check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  color: #fff;
+  font-family: var(--font-mono);
+}
+
+.theme-card__label {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  padding: 0 var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.theme-card__desc {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--color-text-faint);
+  letter-spacing: 0.06em;
+  padding: 0 var(--space-3) var(--space-3);
+  line-height: 1.4;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 720px) {
   .auth-card,
   .settings-panel {
@@ -243,5 +383,15 @@
 
   .settings-tabs {
     grid-template-columns: 1fr;
+  }
+
+  .theme-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  .theme-grid {
+    grid-template-columns: 1fr 1fr;
   }
 }
