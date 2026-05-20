@@ -1,6 +1,8 @@
 /* ── Widget : To-Do ──────────────────────────────────────── */
 import { state } from '../state.js';
 import { deleteTodo, saveTodos } from '../user-data.js';
+import { persistMutation } from '../lib/persist.js';
+import { renderGrid } from '../grid.js';
 import { esc } from '../utils/escape.js';
 
 function getTodos() {
@@ -8,11 +10,15 @@ function getTodos() {
 }
 
 function setTodos(next) {
-  state.set('user.todos', next);
+  state.set('user.todos', next.map(todo => ({ ...todo })));
 }
 
 function nextPosition(todos) {
   return todos.length ? Math.max(...todos.map(t => Number(t.position) || 0)) + 1 : 0;
+}
+
+function cloneTodos(todos) {
+  return todos.map(todo => ({ ...todo }));
 }
 
 function renderCompact(container) {
@@ -48,15 +54,31 @@ export const todoWidget = {
   },
 
   renderDetail(container) {
-    let todos = [...getTodos()];
+    let todos = cloneTodos(getTodos());
+    let syncMessage = '';
+    let syncError = false;
+    let statusTimer = null;
 
-    function persist() {
-      setTodos(todos);
-      saveTodos(state.get('user.id'), todos).catch(() => {});
+    function setStatus(message = '', error = false, autoClear = false) {
+      syncMessage = message;
+      syncError = error;
+
+      if (statusTimer) {
+        clearTimeout(statusTimer);
+        statusTimer = null;
+      }
+
+      if (autoClear && message) {
+        statusTimer = setTimeout(() => {
+          if (!container.isConnected) return;
+          syncMessage = '';
+          syncError = false;
+          redraw();
+        }, 2000);
+      }
     }
 
     function redraw() {
-      persist();
       const done = todos.filter(t => t.done).length;
 
       container.innerHTML = `
@@ -65,6 +87,11 @@ export const todoWidget = {
             <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-muted)">${done} / ${todos.length} terminées</span>
             ${done > 0 ? `<button class="quote-btn" id="todo-clear">Supprimer les terminées</button>` : ''}
           </div>
+
+          <div id="todo-sync-status" style="margin-bottom:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:${syncError ? '#c84a4a' : 'var(--color-text-faint)'}">
+            ${esc(syncMessage)}
+          </div>
+
           <ul class="todo-list" id="todo-list">
             ${todos.length === 0
               ? `<li style="text-align:center;padding:var(--space-8);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint)">Aucune tâche — ajoutez-en une !</li>`
@@ -86,39 +113,78 @@ export const todoWidget = {
       const addBtn = container.querySelector('#todo-add');
       const clearBtn = container.querySelector('#todo-clear');
 
-      function addTodo() {
+      async function persistTodos(nextTodos, action, successMessage = 'Sauvegardé') {
+        const previous = cloneTodos(todos);
+        todos = cloneTodos(nextTodos);
+        setTodos(todos);
+        setStatus('Sauvegarde…');
+        renderGrid();
+        redraw();
+
+        try {
+          await persistMutation({
+            action,
+            rollback: () => {
+              todos = cloneTodos(previous);
+              setTodos(previous);
+            },
+            errorMessage: 'Impossible de sauvegarder les tâches.',
+          });
+          setStatus(successMessage, false, true);
+          renderGrid();
+          redraw();
+        } catch (err) {
+          console.error('Todo save failed:', err);
+          setStatus('Erreur de sauvegarde', true);
+          renderGrid();
+          redraw();
+        }
+      }
+
+      async function addTodo() {
         const text = input.value.trim();
         if (!text) return;
-        todos = [{ id: crypto.randomUUID?.() || String(Date.now()), text, done: false, position: nextPosition(todos) }, ...todos];
+        const next = [
+          { id: crypto.randomUUID?.() || String(Date.now()), text, done: false, position: nextPosition(todos) },
+          ...todos,
+        ];
         input.value = '';
-        redraw();
+        await persistTodos(next, () => saveTodos(state.get('user.id'), next), 'Tâche ajoutée');
       }
 
       addBtn?.addEventListener('click', addTodo);
       input?.addEventListener('keydown', e => { if (e.key === 'Enter') addTodo(); });
 
       container.querySelectorAll('[data-check]').forEach(el => {
-        el.addEventListener('click', () => {
+        el.addEventListener('click', async () => {
           const idx = Number(el.dataset.check);
-          todos[idx] = { ...todos[idx], done: !todos[idx].done };
-          redraw();
+          const next = cloneTodos(todos);
+          next[idx] = { ...next[idx], done: !next[idx].done };
+          await persistTodos(next, () => saveTodos(state.get('user.id'), next), 'Tâche mise à jour');
         });
       });
 
       container.querySelectorAll('[data-del]').forEach(el => {
         el.addEventListener('click', async () => {
           const idx = Number(el.dataset.del);
-          const todo = todos[idx];
-          todos.splice(idx, 1);
-          setTodos(todos);
-          await deleteTodo(state.get('user.id'), todo.id).catch(() => {});
-          redraw();
+          const removed = todos[idx];
+          const next = todos.filter((_, i) => i !== idx);
+          await persistTodos(next, () => deleteTodo(state.get('user.id'), removed.id), 'Tâche supprimée');
         });
       });
 
       clearBtn?.addEventListener('click', async () => {
-        todos = todos.filter(t => !t.done);
-        redraw();
+        const removedTodos = todos.filter(t => t.done);
+        const next = todos.filter(t => !t.done);
+        await persistTodos(
+          next,
+          async () => {
+            for (const todo of removedTodos) {
+              await deleteTodo(state.get('user.id'), todo.id);
+            }
+          },
+          'Tâches supprimées'
+        );
       });
     }
 
