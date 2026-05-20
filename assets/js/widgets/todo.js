@@ -1,6 +1,7 @@
 /* ── Widget : To-Do ──────────────────────────────────────── */
 import { state } from '../state.js';
-import { deleteTodo, saveTodos, upsertTodo } from '../user-data.js';
+import { deleteTodo, saveTodos } from '../user-data.js';
+import { esc } from '../utils/escape.js';
 
 function getTodos() {
   return state.get('user.todos') || [];
@@ -29,7 +30,7 @@ function renderCompact(container) {
             ${todos.slice(0, 5).map(t => `
               <li class="todo-item ${t.done ? 'done' : ''}">
                 <div class="todo-check">${t.done ? '✓' : ''}</div>
-                <span class="todo-text">${t.text}</span>
+                <span class="todo-text">${esc(t.text)}</span>
               </li>`).join('')}
            </ul>
            ${todos.length > 5 ? `<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);margin-top:var(--space-1)">+${todos.length - 5} autres…</div>` : ''}`
@@ -70,7 +71,7 @@ export const todoWidget = {
               : todos.map((t, i) => `
                 <li class="todo-item ${t.done ? 'done' : ''}" data-i="${i}">
                   <div class="todo-check" data-check="${i}">${t.done ? '✓' : ''}</div>
-                  <span class="todo-text">${t.text}</span>
+                  <span class="todo-text">${esc(t.text)}</span>
                   <span class="todo-delete" data-del="${i}">×</span>
                 </li>`).join('')
             }
