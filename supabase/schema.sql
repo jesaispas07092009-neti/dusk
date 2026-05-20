@@ -70,32 +70,43 @@ create table if not exists public.mood_log (
   logged_at  timestamptz not null default now()
 );
 
+-- ── Fonction admin ───────────────────────────────────────────
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+    and role = 'admin'
+  );
+$$;
+
 -- ── Row Level Security ───────────────────────────────────────
 
-alter table public.profiles   enable row level security;
-alter table public.widget_prefs enable row level security;
-alter table public.todos      enable row level security;
-alter table public.links      enable row level security;
-alter table public.projects   enable row level security;
-alter table public.mood_log   enable row level security;
+alter table public.profiles      enable row level security;
+alter table public.widget_prefs   enable row level security;
+alter table public.todos          enable row level security;
+alter table public.links          enable row level security;
+alter table public.projects       enable row level security;
+alter table public.mood_log       enable row level security;
 
--- Profiles : lecture scopée (user = le sien, admin = tous)
-drop policy if exists "profiles_select_own"  on public.profiles;
+-- Profiles : lecture propre (user = le sien, admin = tous)
+drop policy if exists "profiles_select_own" on public.profiles;
 drop policy if exists "profiles_select_admin" on public.profiles;
-drop policy if exists "profiles_select"       on public.profiles;
-drop policy if exists "profiles_insert"       on public.profiles;
-drop policy if exists "profiles_update"       on public.profiles;
+drop policy if exists "profiles_select" on public.profiles;
+drop policy if exists "profiles_insert" on public.profiles;
+drop policy if exists "profiles_update" on public.profiles;
 
 create policy "profiles_select_own" on public.profiles
   for select using (auth.uid() = id);
 
 create policy "profiles_select_admin" on public.profiles
-  for select using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
-  );
+  for select using (public.is_admin());
 
 create policy "profiles_insert" on public.profiles
   for insert with check (auth.uid() = id);
@@ -103,10 +114,11 @@ create policy "profiles_insert" on public.profiles
 create policy "profiles_update" on public.profiles
   for update using (
     auth.uid() = id
-    or exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
+    or public.is_admin()
+  )
+  with check (
+    auth.uid() = id
+    or public.is_admin()
   );
 
 -- Autres tables : accès exclusif à l'owner
@@ -171,8 +183,13 @@ create trigger on_auth_user_created
 -- ── Trigger : updated_at automatique ────────────────────────
 
 create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin new.updated_at = now(); return new; end;
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
 $$;
 
 drop trigger if exists profiles_updated_at on public.profiles;
