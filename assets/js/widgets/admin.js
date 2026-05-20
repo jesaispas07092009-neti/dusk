@@ -1,6 +1,7 @@
 /* ── Widget : Admin ──────────────────────────────────────── */
-import { state }    from '../state.js';
+import { state } from '../state.js';
 import { supabase } from '../supabase.js';
+import { esc } from '../utils/escape.js';
 
 function isAdmin() {
   return state.get('user.profile')?.role === 'admin';
@@ -26,10 +27,10 @@ async function setRole(userId, role) {
 }
 
 export const adminWidget = {
-  id:         'admin',
-  label:      'Admin',
-  size:       'small',
-  adminOnly:  true,
+  id: 'admin',
+  label: 'Admin',
+  size: 'small',
+  adminOnly: true,
 
   render(container) {
     if (!isAdmin()) { container.innerHTML = ''; return; }
@@ -52,14 +53,14 @@ export const adminWidget = {
     }
 
     function renderError(msg) {
-      container.innerHTML = `<div class="wc-center" style="padding:var(--space-8)"><div style="color:#c84a4a;font-family:var(--font-mono);font-size:var(--text-sm)">${msg}</div></div>`;
+      container.innerHTML = `<div class="wc-center" style="padding:var(--space-8)"><div style="color:#c84a4a;font-family:var(--font-mono);font-size:var(--text-sm)">${esc(msg)}</div></div>`;
     }
 
     async function renderUsers() {
       renderLoading();
       let users;
       try { users = await loadUsers(); }
-      catch (e) { renderError('Erreur de chargement : ' + e.message); return; }
+      catch (e) { renderError('Erreur de chargement : ' + (e?.message || 'inconnue')); return; }
 
       const currentId = state.get('user.id');
       const adminCount = users.filter(u => u.role === 'admin').length;
@@ -82,23 +83,23 @@ export const adminWidget = {
               return `
                 <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-radius:var(--radius-md);background:var(--color-surface-2);border:1px solid var(--color-border)">
                   <div style="width:36px;height:36px;border-radius:50%;background:${isAdminUser ? 'rgba(200,129,60,0.18)' : 'var(--color-surface-3)'};display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:var(--text-xs);color:${isAdminUser ? 'var(--color-amber)' : 'var(--color-text-muted)'}">
-                    ${initials}
+                    ${esc(initials)}
                   </div>
                   <div style="flex:1;min-width:0">
                     <div style="font-size:var(--text-sm);color:var(--color-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                      ${u.name || 'Utilisateur'}${isSelf ? ' <span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--color-text-faint)">(vous)</span>' : ''}
+                      ${esc(u.name || 'Utilisateur')}${isSelf ? ' <span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--color-text-faint)">(vous)</span>' : ''}
                     </div>
                     <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint)">
                       ${new Date(u.created_at).toLocaleDateString('fr-FR')}
                     </div>
                   </div>
                   <span style="font-family:var(--font-mono);font-size:0.65rem;padding:3px 10px;border-radius:999px;background:${isAdminUser ? 'rgba(200,129,60,0.14)' : 'var(--color-surface-3)'};color:${isAdminUser ? 'var(--color-amber)' : 'var(--color-text-faint)'};border:1px solid ${isAdminUser ? 'rgba(200,129,60,0.28)' : 'var(--color-border)'}">
-                    ${u.role}
+                    ${esc(u.role)}
                   </span>
                   ${!isSelf ? `
                     <button
-                      data-toggle-role="${u.id}"
-                      data-current-role="${u.role}"
+                      data-toggle-role="${esc(u.id)}"
+                      data-current-role="${esc(u.role)}"
                       style="font-family:var(--font-mono);font-size:0.65rem;padding:4px 12px;border-radius:999px;border:1px solid var(--color-border);background:transparent;color:var(--color-text-muted);cursor:pointer"
                       title="${isAdminUser ? 'Rétrograder en user' : 'Promouvoir admin'}">
                       ${isAdminUser ? '↓ user' : '↑ admin'}
