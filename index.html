@@ -11,6 +11,13 @@
 
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 
+  <!--
+    Ordre de chargement CSS intentionnel :
+    1. themes.css  — définit toutes les variables --color-*, --blur-*, etc. par thème
+    2. main.css    — utilise ces variables, définit les variables structurelles (typo, spacing…)
+    3. autres      — s'appuient sur l'ensemble des variables
+  -->
+  <link rel="stylesheet" href="assets/css/themes.css" />
   <link rel="stylesheet" href="assets/css/main.css" />
   <link rel="stylesheet" href="assets/css/layout.css" />
   <link rel="stylesheet" href="assets/css/widgets.css" />
