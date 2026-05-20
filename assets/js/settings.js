@@ -7,19 +7,11 @@ import { saveProfile, saveWidgetPrefs }         from './user-data.js';
 import { getWidgetRegistry, WIDGET_REGISTRY_ALL } from './registry.js';
 import { renderGrid }                           from './grid.js';
 import { openAuth }                             from './auth-ui.js';
+import { esc }                                  from './utils/escape.js';
 
 const ROOT_ID = 'settings-root';
 
 function root() { return document.getElementById(ROOT_ID); }
-
-function esc(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 function closeSettings() {
   state.set('ui.settingsOpen', false);
