@@ -9,6 +9,7 @@ import { renderGrid }                           from './grid.js';
 import { openAuth }                             from './auth-ui.js';
 import { persistMutation }                      from './lib/persist.js';
 import { esc }                                  from './utils/escape.js';
+import { THEMES, applyTheme, getCurrentTheme }  from './theme-engine.js';
 
 const ROOT_ID = 'settings-root';
 
@@ -34,9 +35,10 @@ function isAdmin() {
 
 function renderHeader(activeTab) {
   const tabs = [
-    ['profile', 'Profil'],
-    ['widgets', 'Widgets'],
-    ['account', 'Compte'],
+    ['profile',   'Profil'],
+    ['ambiance',  'Ambiance'],
+    ['widgets',   'Widgets'],
+    ['account',   'Compte'],
     ...(isAdmin() ? [['admin-tab', '🛡 Admin']] : []),
   ];
   return `
@@ -132,6 +134,93 @@ function renderProfileTab(container) {
   });
 }
 
+/* ── Onglet Ambiance ── */
+function renderAmbianceTab(container) {
+  const currentThemeId = getCurrentTheme();
+
+  container.innerHTML = `
+    <div>
+      <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);margin-bottom:var(--space-5);line-height:1.7">
+        Chaque ambiance transforme l'atmosphère entière de Dusk — couleurs, lumière, profondeur et rythme.
+      </p>
+      <div class="theme-grid">
+        ${THEMES.map(theme => {
+          const isActive = theme.id === currentThemeId;
+          return `
+            <button
+              class="theme-card ${isActive ? 'theme-card--active' : ''}"
+              data-theme-pick="${esc(theme.id)}"
+              aria-label="Thème ${esc(theme.label)}"
+              aria-pressed="${isActive}"
+              type="button"
+            >
+              <div class="theme-card__preview" style="
+                background: ${esc(theme.bg)};
+                border: 1px solid ${isActive ? theme.accent : 'rgba(255,255,255,0.06)'};
+              ">
+                <div class="theme-card__surface" style="background: ${esc(theme.surface)};"></div>
+                <div class="theme-card__surface theme-card__surface--2" style="background: ${esc(theme.surface)};"></div>
+                <div class="theme-card__dot" style="background: ${esc(theme.accent)}; box-shadow: 0 0 8px ${esc(theme.accent)};"></div>
+                ${isActive ? `<div class="theme-card__check">✓</div>` : ''}
+              </div>
+              <div class="theme-card__label">${esc(theme.label)}</div>
+              <div class="theme-card__desc">${esc(theme.description)}</div>
+            </button>`;
+        }).join('')}
+      </div>
+      <div id="theme-save-status" style="min-height:1.25em;margin-top:var(--space-4);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);text-align:center"></div>
+    </div>`;
+
+  container.querySelectorAll('[data-theme-pick]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const themeId = btn.dataset.themePick;
+      const status  = container.querySelector('#theme-save-status');
+
+      /* Feedback visuel immédiat */
+      container.querySelectorAll('.theme-card').forEach(c => {
+        const active = c.dataset.themePick === themeId;
+        c.classList.toggle('theme-card--active', active);
+        c.setAttribute('aria-pressed', active);
+        const check = c.querySelector('.theme-card__check');
+        if (check) check.remove();
+        if (active) {
+          const dot = c.querySelector('.theme-card__preview');
+          if (dot) dot.insertAdjacentHTML('beforeend', '<div class="theme-card__check">✓</div>');
+        }
+        const preview = c.querySelector('.theme-card__preview');
+        if (preview) {
+          const theme = THEMES.find(t => t.id === c.dataset.themePick);
+          if (theme) preview.style.borderColor = active ? theme.accent : 'rgba(255,255,255,0.06)';
+        }
+      });
+
+      /* Appliquer le thème (inclut la persistance) */
+      try {
+        await applyTheme(themeId);
+
+        /* Persister aussi dans le profil Supabase via saveProfile */
+        const userId = state.get('user.id');
+        if (userId) {
+          const profile = state.get('user.profile') || {};
+          const updated = await saveProfile(userId, { ...profile, theme: themeId });
+          state.set('user.profile', updated);
+        }
+
+        if (status) {
+          status.textContent = '✓ Ambiance appliquée';
+          setTimeout(() => { if (status.isConnected) status.textContent = ''; }, 2000);
+        }
+      } catch (err) {
+        console.error('Theme save failed:', err);
+        if (status) {
+          status.style.color = '#c84a4a';
+          status.textContent = 'Erreur lors de la sauvegarde';
+        }
+      }
+    });
+  });
+}
+
 /* ── Onglet Widgets ── */
 function renderWidgetsTab(container) {
   const registry = getWidgetRegistry();
@@ -217,7 +306,7 @@ function renderAccountTab(container) {
         <div>
           <div class="settings-account-label">Rôle</div>
           <div class="settings-account-value">
-            <span style="font-family:var(--font-mono);font-size:var(--text-xs);padding:3px 10px;border-radius:999px;background:${role === 'admin' ? 'rgba(200,129,60,0.14)' : 'var(--color-surface-3)'};color:${role === 'admin' ? 'var(--color-amber)' : 'var(--color-text-faint)'};border:1px solid ${role === 'admin' ? 'rgba(200,129,60,0.28)' : 'var(--color-border)'}">
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);padding:3px 10px;border-radius:999px;background:${role === 'admin' ? 'rgba(200,129,60,0.14)' : 'var(--color-surface-3)'};color:${role === 'admin' ? 'var(--color-accent)' : 'var(--color-text-faint)'};border:1px solid ${role === 'admin' ? 'rgba(200,129,60,0.28)' : 'var(--color-border)'}">
               ${esc(role)}
             </span>
           </div>
@@ -272,14 +361,14 @@ function renderAdminTab(container) {
             const initials  = esc(u.initials || (u.name || '?').slice(0, 2).toUpperCase());
             return `
               <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-radius:var(--radius-md);background:var(--color-surface-2);border:1px solid var(--color-border)">
-                <div style="width:32px;height:32px;border-radius:50%;background:${isAdminU ? 'rgba(200,129,60,0.18)' : 'var(--color-surface-3)'};display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.6rem;color:${isAdminU ? 'var(--color-amber)' : 'var(--color-text-muted)'}">
+                <div style="width:32px;height:32px;border-radius:50%;background:${isAdminU ? 'rgba(200,129,60,0.18)' : 'var(--color-surface-3)'};display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.6rem;color:${isAdminU ? 'var(--color-accent)' : 'var(--color-text-muted)'}">
                   ${initials}
                 </div>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:var(--text-sm);color:var(--color-text)">${esc(u.name) || 'Utilisateur'}${isSelf ? ' <span style="opacity:.4;font-size:0.6rem">(vous)</span>' : ''}</div>
                   <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--color-text-faint)">${new Date(u.created_at).toLocaleDateString('fr-FR')}</div>
                 </div>
-                <span style="font-family:var(--font-mono);font-size:0.62rem;padding:3px 8px;border-radius:999px;background:${isAdminU ? 'rgba(200,129,60,0.14)' : 'var(--color-surface-3)'};color:${isAdminU ? 'var(--color-amber)' : 'var(--color-text-faint)'};border:1px solid ${isAdminU ? 'rgba(200,129,60,0.28)' : 'var(--color-border)'}">
+                <span style="font-family:var(--font-mono);font-size:0.62rem;padding:3px 8px;border-radius:999px;background:${isAdminU ? 'rgba(200,129,60,0.14)' : 'var(--color-surface-3)'};color:${isAdminU ? 'var(--color-accent)' : 'var(--color-text-faint)'};border:1px solid ${isAdminU ? 'rgba(200,129,60,0.28)' : 'var(--color-border)'}">
                   ${esc(u.role)}
                 </span>
                 ${!isSelf ? `
@@ -340,7 +429,8 @@ export function renderSettings() {
     </aside>`;
 
   const content = el.querySelector('[data-settings-content]');
-  if      (activeTab === 'widgets')   renderWidgetsTab(content);
+  if      (activeTab === 'ambiance')  renderAmbianceTab(content);
+  else if (activeTab === 'widgets')   renderWidgetsTab(content);
   else if (activeTab === 'account')   renderAccountTab(content);
   else if (activeTab === 'admin-tab') renderAdminTab(content);
   else                                renderProfileTab(content);
