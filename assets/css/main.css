@@ -1,178 +1,124 @@
 /* ═══════════════════════════════════════════════════════════
-   DUSK — main.css
-   Variables · Reset · Typographie · Ambiance globale
+   DUSK — main.js
 ═══════════════════════════════════════════════════════════ */
+import { initGrid, renderGrid }           from './grid.js';
+import { initModal }                      from './modal.js';
+import { state }                          from './state.js';
+import { bootstrapAuth, onAuthChange }    from './auth.js';
+import { openAuth }                       from './auth-ui.js';
+import { initSettings, refreshSettingsIfOpen } from './settings.js';
+import { loadDashboardData }              from './user-data.js';
+import { initThemeEngine, syncThemeFromProfile } from './theme-engine.js';
 
-:root {
-  --color-bg:           #0f0e0d;
-  --color-surface:      #181614;
-  --color-surface-2:    #201d1a;
-  --color-surface-3:    #2a2622;
-  --color-border:       rgba(255, 255, 255, 0.06);
-  --color-border-warm:  rgba(200, 140, 60, 0.15);
+let loadSeq = 0;
 
-  --color-amber:        #c8813c;
-  --color-amber-light:  #e09b52;
-  --color-amber-dim:    rgba(200, 129, 60, 0.12);
-  --color-amber-glow:   rgba(200, 129, 60, 0.06);
+async function bootstrap() {
+  initIcons();
+  initModal();
+  initSettings();
+  initLiveTime();
+  initScrollHeader();
 
-  --color-text:         #e8e0d6;
-  --color-text-muted:   #7a7067;
-  --color-text-faint:   #3d3830;
+  /* Theme engine : applique le thème initial depuis localStorage
+     AVANT le rendu de la grille, pour éviter tout flash visuel. */
+  initThemeEngine();
 
-  --font-display:  'DM Serif Display', Georgia, serif;
-  --font-mono:     'DM Mono', 'Courier New', monospace;
-  --font-body:     'DM Sans', system-ui, sans-serif;
+  const session = await bootstrapAuth();
+  await loadAndApplyUserState(session);
 
-  --text-xs:    0.6875rem;
-  --text-sm:    0.8125rem;
-  --text-base:  0.9375rem;
-  --text-lg:    1.125rem;
-  --text-xl:    1.375rem;
-  --text-2xl:   1.75rem;
-  --text-3xl:   2.5rem;
+  /* Après le chargement du profil, synchroniser le thème Supabase
+     (peut différer du localStorage si l'utilisateur a changé d'appareil) */
+  syncThemeFromProfile();
 
-  --leading-tight: 1.2;
-  --leading-base:  1.6;
+  initGrid();
+  if (!state.get('session')) openAuth('login');
 
-  --space-1:  0.25rem;
-  --space-2:  0.5rem;
-  --space-3:  0.75rem;
-  --space-4:  1rem;
-  --space-5:  1.25rem;
-  --space-6:  1.5rem;
-  --space-8:  2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
-  --space-16: 4rem;
-
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
-
-  --ease-dusk:   cubic-bezier(0.25, 0.1, 0.25, 1);
-  --ease-emerge: cubic-bezier(0.16, 1, 0.3, 1);
-  --duration-fast:  150ms;
-  --duration-base:  250ms;
-  --duration-slow:  400ms;
-  --duration-modal: 500ms;
-
-  --shadow-widget: 0 2px 8px rgba(0,0,0,0.4), 0 0 0 1px var(--color-border);
-  --shadow-hover:  0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px var(--color-border-warm);
-  --shadow-modal:  0 32px 80px rgba(0,0,0,0.7);
-
-  --header-height: 56px;
+  onAuthChange(async nextSession => {
+    await loadAndApplyUserState(nextSession);
+    syncThemeFromProfile();
+    renderGrid();
+    refreshSettingsIfOpen();
+    if (!nextSession) openAuth('login');
+  });
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+async function loadAndApplyUserState(session) {
+  const seq = ++loadSeq;
 
-html {
-  font-size: 16px;
-  -webkit-text-size-adjust: 100%;
-  scroll-behavior: smooth;
-}
+  const userId = session?.user?.id || null;
+  const email  = session?.user?.email || null;
 
-body {
-  font-family: var(--font-body);
-  font-size: var(--text-base);
-  line-height: var(--leading-base);
-  color: var(--color-text);
-  background-color: var(--color-bg);
-  min-height: 100dvh;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-}
+  if (!userId) {
+    if (seq !== loadSeq) return;
+    state.set('session',           null);
+    state.set('user.id',           null);
+    state.set('user.email',        null);
+    state.set('user.profile',      null);
+    state.set('user.widgetPrefs',  []);
+    state.set('user.todos',        []);
+    state.set('user.links',        []);
+    state.set('user.projects',     []);
+    state.set('user.moodLog',      []);
+    state.set('user.mood',         null);
+    return;
+  }
 
-button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
-a { color: inherit; text-decoration: none; }
-img, svg { display: block; max-width: 100%; }
-p { line-height: var(--leading-base); }
+  const data = await loadDashboardData({ userId, email });
+  if (seq !== loadSeq) return;
 
-:focus { outline: none; }
-:focus-visible {
-  outline: 2px solid var(--color-amber);
-  outline-offset: 3px;
-  border-radius: var(--radius-sm);
-}
-
-.bg-grain {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
-  background-size: 200px 200px;
-  opacity: 0.022;
+  state.set('session',          session);
+  state.set('user.id',          userId);
+  state.set('user.email',       email);
+  state.set('user.profile',     data.profile);
+  state.set('user.widgetPrefs', data.widgetPrefs);
+  state.set('user.todos',       data.todos);
+  state.set('user.links',       data.links);
+  state.set('user.projects',    data.projects);
+  state.set('user.moodLog',     data.moodLog);
+  state.set('user.mood',        data.mood || null);
 }
 
-/* Header */
-.dusk-header {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 100;
-  height: var(--header-height);
-  background: linear-gradient(to bottom, rgba(15,14,13,0.95) 0%, rgba(15,14,13,0) 100%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--duration-base) var(--ease-dusk);
-  animation: fade-up var(--duration-slow) var(--ease-emerge) both;
+function initIcons() {
+  if (window.lucide) lucide.createIcons();
 }
-.dusk-header.is-scrolled { border-bottom-color: var(--color-border); }
 
-.header-inner {
-  max-width: 1440px;
-  margin: 0 auto;
-  height: 100%;
-  padding: 0 var(--space-6);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.header-brand { display: flex; align-items: center; gap: var(--space-3); }
-.brand-dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background-color: var(--color-amber);
-  box-shadow: 0 0 8px var(--color-amber);
-  animation: pulse-amber 3s ease-in-out infinite;
-}
-@keyframes pulse-amber {
-  0%,100% { opacity:1; box-shadow: 0 0 8px var(--color-amber); }
-  50%      { opacity:0.6; box-shadow: 0 0 4px var(--color-amber); }
-}
-.brand-name {
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  letter-spacing: 0.01em;
-}
-.header-nav { display: flex; align-items: center; gap: var(--space-5); }
-.nav-time {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  letter-spacing: 0.08em;
-  min-width: 3.5ch;
-}
-.nav-btn {
-  display: flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  transition: color var(--duration-fast) var(--ease-dusk), background-color var(--duration-fast) var(--ease-dusk);
-}
-.nav-btn:hover { color: var(--color-text); background-color: var(--color-surface-2); }
-.nav-btn svg { width: 16px; height: 16px; stroke-width: 1.75; }
+function initLiveTime() {
+  const el = document.getElementById('live-time');
+  if (!el) return;
 
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.dusk-main { animation: fade-up var(--duration-slow) var(--ease-emerge) 80ms both; }
+  function tick() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    el.textContent = `${h}:${m}`;
+    state.set('time.current', now);
+  }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-surface-3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-text-faint); }
-::selection { background: var(--color-amber-dim); color: var(--color-text); }
+  tick();
+  const msToNext = (60 - new Date().getSeconds()) * 1000;
+  setTimeout(() => {
+    tick();
+    setInterval(tick, 60_000);
+  }, msToNext);
+}
+
+function initScrollHeader() {
+  const header = document.querySelector('.dusk-header');
+  if (!header) return;
+
+  const sentinel = document.createElement('div');
+  sentinel.style.cssText = 'position:absolute;top:0;left:0;height:1px;width:1px;pointer-events:none;';
+  document.body.prepend(sentinel);
+
+  new IntersectionObserver(
+    ([e]) => header.classList.toggle('is-scrolled', !e.isIntersecting),
+    { threshold: 0, rootMargin: '-60px 0px 0px 0px' }
+  ).observe(sentinel);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  bootstrap().catch(err => {
+    console.error('Dusk bootstrap error:', err);
+    openAuth('login');
+  });
+});
