@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from './supabase.js';
+import { supabase, isSupabaseConfigured, wrapSupabaseError } from './supabase.js';
 import { state } from './state.js';
 
 const STORAGE_PREFIX = 'dusk-v2';
@@ -112,6 +112,10 @@ function persistFallbackState({ profile, todos, links, projects, widgetPrefs, mo
   if (moodLog) writeLocal('mood-log', userId, moodLog);
 }
 
+function throwIfSupabaseError(operation, error) {
+  if (error) throw wrapSupabaseError(operation, error);
+}
+
 export async function loadDashboardData({ userId = null, email = null } = {}) {
   const storageUserId = userId || 'anon';
 
@@ -188,7 +192,7 @@ export async function saveProfile(userId, patch) {
   };
 
   const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
-  if (error) throw error;
+  throwIfSupabaseError('profiles.upsert', error);
   return next;
 }
 
@@ -206,7 +210,7 @@ export async function saveWidgetPrefs(userId, prefs) {
   }));
 
   const { error } = await supabase.from('widget_prefs').upsert(rows, { onConflict: 'user_id,widget_id' });
-  if (error) throw error;
+  throwIfSupabaseError('widget_prefs.upsert', error);
   return prefs;
 }
 
@@ -225,7 +229,7 @@ export async function saveTodos(userId, todos) {
   }));
 
   const { error } = await supabase.from('todos').upsert(rows);
-  if (error) throw error;
+  throwIfSupabaseError('todos.upsert', error);
   return todos;
 }
 
@@ -245,7 +249,7 @@ export async function saveLinks(userId, links) {
   }));
 
   const { error } = await supabase.from('links').upsert(rows);
-  if (error) throw error;
+  throwIfSupabaseError('links.upsert', error);
   return links;
 }
 
@@ -266,8 +270,19 @@ export async function saveProjects(userId, projects) {
   }));
 
   const { error } = await supabase.from('projects').upsert(rows);
-  if (error) throw error;
+  throwIfSupabaseError('projects.upsert', error);
   return projects;
+}
+
+export async function deleteProject(userId, projectId) {
+  if (!isSupabaseConfigured || !supabase || !userId) {
+    const projects = readLocal('projects', userId || 'anon', []).filter(project => project.id !== projectId);
+    persistFallbackState({ projects }, userId || 'anon');
+    return projects;
+  }
+
+  const { error } = await supabase.from('projects').delete().eq('id', projectId).eq('user_id', userId);
+  throwIfSupabaseError('projects.delete', error);
 }
 
 export async function saveMood(userId, moodEntry) {
@@ -285,7 +300,7 @@ export async function saveMood(userId, moodEntry) {
   };
 
   const { error } = await supabase.from('mood_log').insert(payload);
-  if (error) throw error;
+  throwIfSupabaseError('mood_log.insert', error);
   return moodEntry;
 }
 
@@ -297,7 +312,7 @@ export async function deleteTodo(userId, todoId) {
   }
 
   const { error } = await supabase.from('todos').delete().eq('id', todoId).eq('user_id', userId);
-  if (error) throw error;
+  throwIfSupabaseError('todos.delete', error);
 }
 
 export async function upsertTodo(userId, todo) {
