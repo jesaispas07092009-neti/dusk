@@ -1,13 +1,14 @@
 /* ═══════════════════════════════════════════════════════════
    DUSK — main.js
 ═══════════════════════════════════════════════════════════ */
-import { initGrid, renderGrid } from './grid.js';
-import { initModal } from './modal.js';
-import { state } from './state.js';
-import { bootstrapAuth, onAuthChange } from './auth.js';
-import { openAuth } from './auth-ui.js';
+import { initGrid, renderGrid }           from './grid.js';
+import { initModal }                      from './modal.js';
+import { state }                          from './state.js';
+import { bootstrapAuth, onAuthChange }    from './auth.js';
+import { openAuth }                       from './auth-ui.js';
 import { initSettings, refreshSettingsIfOpen } from './settings.js';
-import { loadDashboardData } from './user-data.js';
+import { loadDashboardData }              from './user-data.js';
+import { initThemeEngine, syncThemeFromProfile } from './theme-engine.js';
 
 let loadSeq = 0;
 
@@ -18,14 +19,23 @@ async function bootstrap() {
   initLiveTime();
   initScrollHeader();
 
+  /* Theme engine : applique le thème initial depuis localStorage
+     AVANT le rendu de la grille, pour éviter tout flash visuel. */
+  initThemeEngine();
+
   const session = await bootstrapAuth();
   await loadAndApplyUserState(session);
+
+  /* Après le chargement du profil, synchroniser le thème Supabase
+     (peut différer du localStorage si l'utilisateur a changé d'appareil) */
+  syncThemeFromProfile();
 
   initGrid();
   if (!state.get('session')) openAuth('login');
 
   onAuthChange(async nextSession => {
     await loadAndApplyUserState(nextSession);
+    syncThemeFromProfile();
     renderGrid();
     refreshSettingsIfOpen();
     if (!nextSession) openAuth('login');
@@ -36,37 +46,36 @@ async function loadAndApplyUserState(session) {
   const seq = ++loadSeq;
 
   const userId = session?.user?.id || null;
-  const email = session?.user?.email || null;
+  const email  = session?.user?.email || null;
 
   if (!userId) {
     if (seq !== loadSeq) return;
-
-    state.set('session', null);
-    state.set('user.id', null);
-    state.set('user.email', null);
-    state.set('user.profile', null);
-    state.set('user.widgetPrefs', []);
-    state.set('user.todos', []);
-    state.set('user.links', []);
-    state.set('user.projects', []);
-    state.set('user.moodLog', []);
-    state.set('user.mood', null);
+    state.set('session',           null);
+    state.set('user.id',           null);
+    state.set('user.email',        null);
+    state.set('user.profile',      null);
+    state.set('user.widgetPrefs',  []);
+    state.set('user.todos',        []);
+    state.set('user.links',        []);
+    state.set('user.projects',     []);
+    state.set('user.moodLog',      []);
+    state.set('user.mood',         null);
     return;
   }
 
   const data = await loadDashboardData({ userId, email });
   if (seq !== loadSeq) return;
 
-  state.set('session', session);
-  state.set('user.id', userId);
-  state.set('user.email', email);
-  state.set('user.profile', data.profile);
+  state.set('session',          session);
+  state.set('user.id',          userId);
+  state.set('user.email',       email);
+  state.set('user.profile',     data.profile);
   state.set('user.widgetPrefs', data.widgetPrefs);
-  state.set('user.todos', data.todos);
-  state.set('user.links', data.links);
-  state.set('user.projects', data.projects);
-  state.set('user.moodLog', data.moodLog);
-  state.set('user.mood', data.mood || null);
+  state.set('user.todos',       data.todos);
+  state.set('user.links',       data.links);
+  state.set('user.projects',    data.projects);
+  state.set('user.moodLog',     data.moodLog);
+  state.set('user.mood',        data.mood || null);
 }
 
 function initIcons() {
