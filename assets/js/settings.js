@@ -7,6 +7,7 @@ import { saveProfile, saveWidgetPrefs }         from './user-data.js';
 import { getWidgetRegistry, WIDGET_REGISTRY_ALL } from './registry.js';
 import { renderGrid }                           from './grid.js';
 import { openAuth }                             from './auth-ui.js';
+import { persistMutation }                      from './lib/persist.js';
 import { esc }                                  from './utils/escape.js';
 
 const ROOT_ID = 'settings-root';
@@ -97,7 +98,8 @@ function renderProfileTab(container) {
 
     btn.disabled = true;
     btn.textContent = '…';
-    status.textContent = '';
+    status.style.color = 'var(--color-text-faint)';
+    status.textContent = 'Sauvegarde…';
 
     try {
       const payload = {
@@ -108,14 +110,21 @@ function renderProfileTab(container) {
         tags:     form.tags.value.split(',').map(t => t.trim()).filter(Boolean),
       };
       const userId  = state.get('user.id');
-      const updated = await saveProfile(userId, payload);
+      const updated = await persistMutation({
+        action: () => saveProfile(userId, payload),
+        errorMessage: 'Impossible de sauvegarder le profil.',
+      });
       state.set('user.profile', updated);
       renderGrid();
+      status.style.color = 'var(--color-text-faint)';
       status.textContent = '✓ Sauvegardé';
-      setTimeout(() => { status.textContent = ''; }, 2500);
+      setTimeout(() => {
+        if (status.isConnected) status.textContent = '';
+      }, 2500);
     } catch (err) {
+      console.error('Profile save failed:', err);
       status.style.color = '#c84a4a';
-      status.textContent = 'Erreur : ' + (err.message || 'inconnue');
+      status.textContent = 'Erreur : impossible de sauvegarder le profil.';
     } finally {
       btn.disabled    = false;
       btn.textContent = 'Enregistrer';
@@ -133,6 +142,7 @@ function renderWidgetsTab(container) {
     <p style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);margin-bottom:var(--space-3)">
       Active ou désactive les widgets affichés sur ton dashboard.
     </p>
+    <div id="widgets-save-status" style="min-height:1.25em;margin-bottom:var(--space-3);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint)"></div>
     <div class="settings-widget-list">
       ${registry.map((widget, index) => {
         const pref = byId.get(widget.id) || { enabled: true, position: index };
@@ -150,13 +160,43 @@ function renderWidgetsTab(container) {
   container.querySelectorAll('[data-widget-toggle]').forEach(toggle => {
     toggle.addEventListener('change', async () => {
       const widgetId = toggle.dataset.widgetToggle;
+      const previous = getPrefs();
       const next = normalizedPrefs(
-        getPrefs().map(p => p.widget_id === widgetId ? { ...p, enabled: toggle.checked } : p)
+        previous.map(p => p.widget_id === widgetId ? { ...p, enabled: toggle.checked } : p)
       );
       const userId = state.get('user.id');
-      await saveWidgetPrefs(userId, next).catch(() => {});
-      state.set('user.widgetPrefs', next);
-      renderGrid();
+      const status = container.querySelector('#widgets-save-status');
+
+      if (status) {
+        status.style.color = 'var(--color-text-faint)';
+        status.textContent = 'Sauvegarde…';
+      }
+
+      try {
+        await persistMutation({
+          action: () => saveWidgetPrefs(userId, next),
+          errorMessage: 'Impossible de sauvegarder les widgets.',
+        });
+        state.set('user.widgetPrefs', next);
+        renderGrid();
+
+        if (status) {
+          status.style.color = 'var(--color-text-faint)';
+          status.textContent = '✓ Sauvegardé';
+          setTimeout(() => {
+            const live = container.querySelector('#widgets-save-status');
+            if (live && live.isConnected) live.textContent = '';
+          }, 1800);
+        }
+      } catch (err) {
+        console.error('Widget prefs save failed:', err);
+        toggle.checked = !toggle.checked;
+
+        if (status) {
+          status.style.color = '#c84a4a';
+          status.textContent = 'Erreur de sauvegarde';
+        }
+      }
     });
   });
 }
@@ -198,8 +238,6 @@ function renderAdminTab(container) {
     container.innerHTML = `<div style="padding:var(--space-8);text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint)">Accès refusé.</div>`;
     return;
   }
-
-  const { supabase } = window._dusk_supabase || {};
 
   container.innerHTML = `<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);padding:var(--space-4)">Chargement des utilisateurs…</div>`;
 
@@ -260,9 +298,21 @@ function renderAdminTab(container) {
         const newRole = btn.dataset.currentRole === 'admin' ? 'user' : 'admin';
         btn.textContent = '…';
         btn.disabled    = true;
-        const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
-        if (!error) renderAdminTab(container);
-        else { btn.textContent = 'Erreur'; btn.disabled = false; }
+
+        try {
+          await persistMutation({
+            action: async () => {
+              const { error: updateError } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+              if (updateError) throw updateError;
+            },
+            errorMessage: 'Impossible de modifier le rôle.',
+          });
+          renderAdminTab(container);
+        } catch (err) {
+          console.error('Admin role update failed:', err);
+          btn.textContent = 'Erreur';
+          btn.disabled = false;
+        }
       });
     });
   });
