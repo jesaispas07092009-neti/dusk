@@ -2,16 +2,17 @@
    DUSK — grid.js
    Construit la grille depuis le registre et applique les prefs user
 ═══════════════════════════════════════════════════════════ */
-import { state }                               from './state.js';
-import { openModal }                           from './modal.js';
+import { state } from './state.js';
+import { openModal } from './modal.js';
 import { getWidgetRegistry, WIDGET_REGISTRY_ALL } from './registry.js';
+import { esc } from './utils/escape.js';
 
 const STAGGER_MS = 65;
-let gridBound    = false;
+let gridBound = false;
 
 function getVisibleRegistry() {
   const registry = getWidgetRegistry();
-  const prefs    = state.get('user.widgetPrefs') || [];
+  const prefs = state.get('user.widgetPrefs') || [];
 
   if (!prefs.length) return registry;
 
@@ -45,12 +46,12 @@ function buildWidgetEl(widget) {
   ].filter(Boolean).join(' ');
   article.dataset.widgetId = widget.id;
   if (expandable) article.setAttribute('tabindex', '0');
-  article.setAttribute('aria-label', `Widget ${widget.label}`);
+  article.setAttribute('aria-label', `Widget ${esc(widget.label)}`);
 
   article.innerHTML = `
     <div class="widget-inner">
       <header class="widget-header">
-        <span class="widget-label">${widget.label}</span>
+        <span class="widget-label">${esc(widget.label)}</span>
         ${expandable ? `
           <button class="widget-expand-btn" aria-label="Ouvrir en plein écran">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -74,7 +75,7 @@ function initWidgetClicks() {
   grid.addEventListener('click', e => {
     const widget = e.target.closest('.widget--expandable');
     if (!widget) return;
-    const id  = widget.dataset.widgetId;
+    const id = widget.dataset.widgetId;
     const def = WIDGET_REGISTRY_ALL.find(w => w.id === id);
     if (!def || typeof def.renderDetail !== 'function') return;
     openModal(id, def.label, def.renderDetail.bind(def));
