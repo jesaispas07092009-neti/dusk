@@ -16,9 +16,24 @@ create table if not exists public.profiles (
   bio        text default '',
   tags       text[] not null default '{}',
   stats      jsonb not null default '[]'::jsonb,
+  theme      text not null default 'dusk',   -- ← thème atmosphérique actif
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Migration : ajouter la colonne theme si la table profiles existe déjà
+-- (à exécuter une seule fois sur une base existante)
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name   = 'profiles'
+      and column_name  = 'theme'
+  ) then
+    alter table public.profiles add column theme text not null default 'dusk';
+  end if;
+end $$;
 
 create table if not exists public.widget_prefs (
   id         uuid primary key default gen_random_uuid(),
@@ -96,11 +111,11 @@ alter table public.projects       enable row level security;
 alter table public.mood_log       enable row level security;
 
 -- Profiles : lecture propre (user = le sien, admin = tous)
-drop policy if exists "profiles_select_own" on public.profiles;
+drop policy if exists "profiles_select_own"   on public.profiles;
 drop policy if exists "profiles_select_admin" on public.profiles;
-drop policy if exists "profiles_select" on public.profiles;
-drop policy if exists "profiles_insert" on public.profiles;
-drop policy if exists "profiles_update" on public.profiles;
+drop policy if exists "profiles_select"       on public.profiles;
+drop policy if exists "profiles_insert"       on public.profiles;
+drop policy if exists "profiles_update"       on public.profiles;
 
 create policy "profiles_select_own" on public.profiles
   for select using (auth.uid() = id);
@@ -151,11 +166,12 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, name, initials)
+  insert into public.profiles (id, name, initials, theme)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1), 'Dusk'),
-    upper(left(coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1), 'Dusk'), 2))
+    upper(left(coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1), 'Dusk'), 2)),
+    'dusk'
   )
   on conflict (id) do nothing;
 
