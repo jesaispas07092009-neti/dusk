@@ -1,0 +1,276 @@
+/* ═══════════════════════════════════════════════════════════
+   DUSK — themes.css
+   Moteur de thèmes atmosphériques.
+   Chaque thème surcharge les variables définies dans :root (main.css).
+   Le thème actif est contrôlé via html[data-theme="..."]
+   Ordre de chargement : themes.css → main.css
+═══════════════════════════════════════════════════════════ */
+
+/* ── Transition globale lors d'un changement de thème ──────── */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 600ms cubic-bezier(0.25, 0.1, 0.25, 1),
+    color            400ms cubic-bezier(0.25, 0.1, 0.25, 1),
+    border-color     400ms cubic-bezier(0.25, 0.1, 0.25, 1),
+    box-shadow       400ms cubic-bezier(0.25, 0.1, 0.25, 1),
+    opacity          400ms cubic-bezier(0.25, 0.1, 0.25, 1) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THÈME : DUSK (défaut)
+   Ambre chaud, nuit profonde, chaleur de bougie lointaine.
+   Le thème original — calme, organique, intemporel.
+══════════════════════════════════════════════════════════════ */
+[data-theme="dusk"] {
+  /* Couleurs de fond */
+  --color-bg:           #0f0e0d;
+  --color-surface:      #181614;
+  --color-surface-2:    #201d1a;
+  --color-surface-3:    #2a2622;
+
+  /* Bordures */
+  --color-border:       rgba(255, 255, 255, 0.06);
+  --color-border-warm:  rgba(200, 140, 60, 0.15);
+
+  /* Couleur d'accent */
+  --color-accent:        #c8813c;
+  --color-accent-light:  #e09b52;
+  --color-accent-dim:    rgba(200, 129, 60, 0.12);
+  --color-accent-glow:   rgba(200, 129, 60, 0.06);
+
+  /* Aliases amber → accent (rétrocompatibilité) */
+  --color-amber:        var(--color-accent);
+  --color-amber-light:  var(--color-accent-light);
+  --color-amber-dim:    var(--color-accent-dim);
+  --color-amber-glow:   var(--color-accent-glow);
+
+  /* Texte */
+  --color-text:         #e8e0d6;
+  --color-text-muted:   #7a7067;
+  --color-text-faint:   #3d3830;
+
+  /* Ombres */
+  --shadow-widget: 0 2px 8px rgba(0,0,0,0.4), 0 0 0 1px var(--color-border);
+  --shadow-hover:  0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px var(--color-border-warm);
+  --shadow-modal:  0 32px 80px rgba(0,0,0,0.7);
+
+  /* Atmosphère */
+  --blur-intensity:      12px;
+  --glow-intensity:      1;
+  --grain-opacity:       0.022;
+  --depth-scale:         1;
+  --motion-speed:        1;
+
+  /* Header bg (utilisé dans main.css) */
+  --header-bg-rgb:       15, 14, 13;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THÈME : MIDNIGHT
+   Bleu nuit pur, presque monochrome. Calme absolu, profondeur froide.
+   Inspiré : Linear, interfaces Apple Dark Mode poussées au maximum.
+══════════════════════════════════════════════════════════════ */
+[data-theme="midnight"] {
+  --color-bg:           #080810;
+  --color-surface:      #0f0f1a;
+  --color-surface-2:    #161625;
+  --color-surface-3:    #1e1e30;
+
+  --color-border:       rgba(255, 255, 255, 0.05);
+  --color-border-warm:  rgba(120, 130, 220, 0.18);
+
+  --color-accent:        #7b8fe8;
+  --color-accent-light:  #9aaef5;
+  --color-accent-dim:    rgba(123, 143, 232, 0.12);
+  --color-accent-glow:   rgba(123, 143, 232, 0.06);
+
+  --color-amber:        var(--color-accent);
+  --color-amber-light:  var(--color-accent-light);
+  --color-amber-dim:    var(--color-accent-dim);
+  --color-amber-glow:   var(--color-accent-glow);
+
+  --color-text:         #dde4f5;
+  --color-text-muted:   #6a7090;
+  --color-text-faint:   #32364a;
+
+  --shadow-widget: 0 2px 12px rgba(0,0,0,0.6), 0 0 0 1px var(--color-border);
+  --shadow-hover:  0 8px 40px rgba(0,0,0,0.65), 0 0 0 1px var(--color-border-warm);
+  --shadow-modal:  0 32px 90px rgba(0,0,0,0.85);
+
+  --blur-intensity:      16px;
+  --glow-intensity:      1.1;
+  --grain-opacity:       0.018;
+  --depth-scale:         1.15;
+  --motion-speed:        0.95;
+
+  --header-bg-rgb:       8, 8, 16;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THÈME : RAIN
+   Gris bleuté humide, brouillard, atmosphère contemplative.
+   Mouvements ralentis, blur renforcé, halos diffus.
+══════════════════════════════════════════════════════════════ */
+[data-theme="rain"] {
+  --color-bg:           #0b0d0f;
+  --color-surface:      #131619;
+  --color-surface-2:    #1a1e23;
+  --color-surface-3:    #21272e;
+
+  --color-border:       rgba(255, 255, 255, 0.055);
+  --color-border-warm:  rgba(130, 180, 210, 0.16);
+
+  --color-accent:        #7fb5cc;
+  --color-accent-light:  #9ecde4;
+  --color-accent-dim:    rgba(127, 181, 204, 0.11);
+  --color-accent-glow:   rgba(127, 181, 204, 0.055);
+
+  --color-amber:        var(--color-accent);
+  --color-amber-light:  var(--color-accent-light);
+  --color-amber-dim:    var(--color-accent-dim);
+  --color-amber-glow:   var(--color-accent-glow);
+
+  --color-text:         #d8dfe8;
+  --color-text-muted:   #68788a;
+  --color-text-faint:   #2e3540;
+
+  --shadow-widget: 0 2px 16px rgba(0,0,0,0.5), 0 0 0 1px var(--color-border);
+  --shadow-hover:  0 8px 48px rgba(0,0,0,0.55), 0 0 0 1px var(--color-border-warm);
+  --shadow-modal:  0 40px 100px rgba(0,0,0,0.8);
+
+  /* Rain : blur maximal, mouvements lents, halos flous */
+  --blur-intensity:      22px;
+  --glow-intensity:      0.8;
+  --grain-opacity:       0.028;
+  --depth-scale:         0.9;
+  --motion-speed:        0.7;
+
+  --header-bg-rgb:       11, 13, 15;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THÈME : DEEP SPACE
+   Noir absolu, contrastes forts, profondeur extrême.
+   Mouvements lents et pondérés. Halos verts émeraude froids.
+   Inspiré : interfaces Obsidian, visualiseurs de données astronomiques.
+══════════════════════════════════════════════════════════════ */
+[data-theme="deep-space"] {
+  --color-bg:           #03040a;
+  --color-surface:      #080c14;
+  --color-surface-2:    #0d1220;
+  --color-surface-3:    #12192c;
+
+  --color-border:       rgba(255, 255, 255, 0.04);
+  --color-border-warm:  rgba(80, 220, 160, 0.14);
+
+  --color-accent:        #50dc9a;
+  --color-accent-light:  #72edb4;
+  --color-accent-dim:    rgba(80, 220, 154, 0.10);
+  --color-accent-glow:   rgba(80, 220, 154, 0.045);
+
+  --color-amber:        var(--color-accent);
+  --color-amber-light:  var(--color-accent-light);
+  --color-amber-dim:    var(--color-accent-dim);
+  --color-amber-glow:   var(--color-accent-glow);
+
+  --color-text:         #c8d8e8;
+  --color-text-muted:   #4a6080;
+  --color-text-faint:   #1e2d40;
+
+  --shadow-widget: 0 2px 16px rgba(0,0,0,0.7), 0 0 0 1px var(--color-border);
+  --shadow-hover:  0 12px 60px rgba(0,0,0,0.8), 0 0 0 1px var(--color-border-warm);
+  --shadow-modal:  0 40px 120px rgba(0,0,0,0.95);
+
+  /* Deep Space : profondeur maximale, mouvements gravitationnels lents */
+  --blur-intensity:      10px;
+  --glow-intensity:      1.4;
+  --grain-opacity:       0.015;
+  --depth-scale:         1.4;
+  --motion-speed:        1.3;
+
+  --header-bg-rgb:       3, 4, 10;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THÈME : EMBER
+   Rouge brique, cuivre brûlé, braises d'une forge lointaine.
+   Chaud, tendu, légèrement électrique.
+══════════════════════════════════════════════════════════════ */
+[data-theme="ember"] {
+  --color-bg:           #100808;
+  --color-surface:      #1a0f0c;
+  --color-surface-2:    #231510;
+  --color-surface-3:    #2e1b14;
+
+  --color-border:       rgba(255, 255, 255, 0.055);
+  --color-border-warm:  rgba(220, 90, 40, 0.18);
+
+  --color-accent:        #d95c28;
+  --color-accent-light:  #f07840;
+  --color-accent-dim:    rgba(217, 92, 40, 0.13);
+  --color-accent-glow:   rgba(217, 92, 40, 0.06);
+
+  --color-amber:        var(--color-accent);
+  --color-amber-light:  var(--color-accent-light);
+  --color-amber-dim:    var(--color-accent-dim);
+  --color-amber-glow:   var(--color-accent-glow);
+
+  --color-text:         #f0e4dc;
+  --color-text-muted:   #806058;
+  --color-text-faint:   #3d2820;
+
+  --shadow-widget: 0 2px 10px rgba(0,0,0,0.45), 0 0 0 1px var(--color-border);
+  --shadow-hover:  0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px var(--color-border-warm);
+  --shadow-modal:  0 32px 90px rgba(0,0,0,0.8);
+
+  --blur-intensity:      10px;
+  --glow-intensity:      1.2;
+  --grain-opacity:       0.025;
+  --depth-scale:         1.05;
+  --motion-speed:        1.05;
+
+  --header-bg-rgb:       16, 8, 8;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THÈME : AURORA
+   Vert-violet, boréal et mystérieux. Lueur lointaine entre deux mondes.
+══════════════════════════════════════════════════════════════ */
+[data-theme="aurora"] {
+  --color-bg:           #060c10;
+  --color-surface:      #0c1418;
+  --color-surface-2:    #111d22;
+  --color-surface-3:    #17262e;
+
+  --color-border:       rgba(255, 255, 255, 0.05);
+  --color-border-warm:  rgba(140, 220, 180, 0.15);
+
+  --color-accent:        #6ddba8;
+  --color-accent-light:  #90eecc;
+  --color-accent-dim:    rgba(109, 219, 168, 0.11);
+  --color-accent-glow:   rgba(109, 219, 168, 0.05);
+
+  --color-amber:        var(--color-accent);
+  --color-amber-light:  var(--color-accent-light);
+  --color-amber-dim:    var(--color-accent-dim);
+  --color-amber-glow:   var(--color-accent-glow);
+
+  --color-text:         #d8f0e8;
+  --color-text-muted:   #5a8070;
+  --color-text-faint:   #1e3830;
+
+  --shadow-widget: 0 2px 14px rgba(0,0,0,0.55), 0 0 0 1px var(--color-border);
+  --shadow-hover:  0 10px 50px rgba(0,0,0,0.65), 0 0 0 1px var(--color-border-warm);
+  --shadow-modal:  0 36px 100px rgba(0,0,0,0.85);
+
+  --blur-intensity:      18px;
+  --glow-intensity:      1.25;
+  --grain-opacity:       0.020;
+  --depth-scale:         1.1;
+  --motion-speed:        0.9;
+
+  --header-bg-rgb:       6, 12, 16;
+}
