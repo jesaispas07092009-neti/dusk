@@ -20,7 +20,12 @@ const defaultState = {
   },
   modal: { isOpen: false, widgetId: null },
   widgets: { visible: [] },
-  ui: { authOpen: false, settingsOpen: false, settingsTab: 'profile' },
+  ui: {
+    authOpen:    false,
+    settingsOpen: false,
+    settingsTab: 'profile',
+    theme:       'dusk',   // thème actif — synchronisé par theme-engine.js
+  },
   time: { current: null },
 };
 
