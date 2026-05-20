@@ -12,6 +12,15 @@ const ROOT_ID = 'settings-root';
 
 function root() { return document.getElementById(ROOT_ID); }
 
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function closeSettings() {
   state.set('ui.settingsOpen', false);
   const el = root();
@@ -64,23 +73,23 @@ function renderProfileTab(container) {
     <form class="settings-form" data-profile-form style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
       <label class="settings-field">
         <span>Initiales</span>
-        <input name="initials" maxlength="3" value="${profile.initials || ''}" />
+        <input name="initials" maxlength="3" value="${esc(profile.initials)}" />
       </label>
       <label class="settings-field">
         <span>Nom affiché</span>
-        <input name="name" maxlength="80" value="${profile.name || ''}" />
+        <input name="name" maxlength="80" value="${esc(profile.name)}" />
       </label>
       <label class="settings-field settings-field--full">
         <span>Rôle / titre</span>
-        <input name="role" maxlength="80" value="${profile.role || ''}" />
+        <input name="role" maxlength="80" value="${esc(profile.role)}" />
       </label>
       <label class="settings-field settings-field--full">
         <span>Bio</span>
-        <textarea name="bio" rows="4">${profile.bio || ''}</textarea>
+        <textarea name="bio" rows="4">${esc(profile.bio)}</textarea>
       </label>
       <label class="settings-field settings-field--full">
         <span>Centres d'intérêt (séparés par des virgules)</span>
-        <input name="tags" value="${Array.isArray(profile.tags) ? profile.tags.join(', ') : ''}" />
+        <input name="tags" value="${esc(Array.isArray(profile.tags) ? profile.tags.join(', ') : '')}" />
       </label>
       <div class="settings-actions" style="grid-column:1/-1">
         <span id="profile-save-status" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint)"></span>
@@ -138,10 +147,10 @@ function renderWidgetsTab(container) {
         return `
           <label class="settings-widget-row">
             <div>
-              <div class="settings-widget-title">${widget.label}</div>
-              <div class="settings-widget-meta">${widget.id}</div>
+              <div class="settings-widget-title">${esc(widget.label)}</div>
+              <div class="settings-widget-meta">${esc(widget.id)}</div>
             </div>
-            <input type="checkbox" data-widget-toggle="${widget.id}" ${pref.enabled !== false ? 'checked' : ''} />
+            <input type="checkbox" data-widget-toggle="${esc(widget.id)}" ${pref.enabled !== false ? 'checked' : ''} />
           </label>`;
       }).join('')}
     </div>`;
@@ -171,13 +180,13 @@ function renderAccountTab(container) {
       <div class="settings-account-card" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
         <div>
           <div class="settings-account-label">Session</div>
-          <div class="settings-account-value" style="word-break:break-all">${email}</div>
+          <div class="settings-account-value" style="word-break:break-all">${esc(email)}</div>
         </div>
         <div>
           <div class="settings-account-label">Rôle</div>
           <div class="settings-account-value">
             <span style="font-family:var(--font-mono);font-size:var(--text-xs);padding:3px 10px;border-radius:999px;background:${role === 'admin' ? 'rgba(200,129,60,0.14)' : 'var(--color-surface-3)'};color:${role === 'admin' ? 'var(--color-amber)' : 'var(--color-text-faint)'};border:1px solid ${role === 'admin' ? 'rgba(200,129,60,0.28)' : 'var(--color-border)'}">
-              ${role}
+              ${esc(role)}
             </span>
           </div>
         </div>
@@ -214,7 +223,7 @@ function renderAdminTab(container) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      container.innerHTML = `<div style="padding:var(--space-4);color:#c84a4a;font-family:var(--font-mono);font-size:var(--text-xs)">Erreur : ${error.message}</div>`;
+      container.innerHTML = `<div style="padding:var(--space-4);color:#c84a4a;font-family:var(--font-mono);font-size:var(--text-xs)">Erreur : ${esc(error.message)}</div>`;
       return;
     }
 
@@ -230,21 +239,21 @@ function renderAdminTab(container) {
           ${(users || []).map(u => {
             const isSelf    = u.id === currentId;
             const isAdminU  = u.role === 'admin';
-            const initials  = u.initials || (u.name || '?').slice(0, 2).toUpperCase();
+            const initials  = esc(u.initials || (u.name || '?').slice(0, 2).toUpperCase());
             return `
               <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-radius:var(--radius-md);background:var(--color-surface-2);border:1px solid var(--color-border)">
                 <div style="width:32px;height:32px;border-radius:50%;background:${isAdminU ? 'rgba(200,129,60,0.18)' : 'var(--color-surface-3)'};display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.6rem;color:${isAdminU ? 'var(--color-amber)' : 'var(--color-text-muted)'}">
                   ${initials}
                 </div>
                 <div style="flex:1;min-width:0">
-                  <div style="font-size:var(--text-sm);color:var(--color-text)">${u.name || 'Utilisateur'}${isSelf ? ' <span style="opacity:.4;font-size:0.6rem">(vous)</span>' : ''}</div>
+                  <div style="font-size:var(--text-sm);color:var(--color-text)">${esc(u.name) || 'Utilisateur'}${isSelf ? ' <span style="opacity:.4;font-size:0.6rem">(vous)</span>' : ''}</div>
                   <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--color-text-faint)">${new Date(u.created_at).toLocaleDateString('fr-FR')}</div>
                 </div>
                 <span style="font-family:var(--font-mono);font-size:0.62rem;padding:3px 8px;border-radius:999px;background:${isAdminU ? 'rgba(200,129,60,0.14)' : 'var(--color-surface-3)'};color:${isAdminU ? 'var(--color-amber)' : 'var(--color-text-faint)'};border:1px solid ${isAdminU ? 'rgba(200,129,60,0.28)' : 'var(--color-border)'}">
-                  ${u.role}
+                  ${esc(u.role)}
                 </span>
                 ${!isSelf ? `
-                  <button data-toggle-role="${u.id}" data-current-role="${u.role}"
+                  <button data-toggle-role="${esc(u.id)}" data-current-role="${esc(u.role)}"
                     style="font-family:var(--font-mono);font-size:0.62rem;padding:4px 10px;border-radius:999px;border:1px solid var(--color-border);background:transparent;color:var(--color-text-muted);cursor:pointer">
                     ${isAdminU ? '↓ user' : '↑ admin'}
                   </button>` : ''}
