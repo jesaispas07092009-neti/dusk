@@ -1,55 +1,109 @@
-/* ── Widget : Stats système (simulées) ───────────────────── */
+/* ── Widget : Activité Dusk ─────────────────────────────── */
+import { buildActivityRows, buildActivitySnapshot, formatDuration } from '../lib/metrics.js';
+import { esc } from '../utils/escape.js';
 
-function rnd(min, max) { return Math.round(Math.random() * (max - min) + min); }
+function renderRows(rows, showNote = false) {
+  return rows.map(row => `
+    <div class="sys-stat">
+      <div class="sys-stat-label">
+        <span>${esc(row.label)}</span>
+        <span>${esc(row.value)}</span>
+      </div>
+      <div class="sys-bar">
+        <div class="sys-bar-fill" style="width:${row.percent}%"></div>
+      </div>
+      ${showNote ? `<div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);margin-top:var(--space-1)">${esc(row.note)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderOverview(snapshot) {
+  return `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-3);margin-bottom:var(--space-5)">
+      <div class="weather-stat">
+        <div class="weather-stat-label">Session</div>
+        <div class="weather-stat-value">${esc(formatDuration(snapshot.sessionMs))}</div>
+      </div>
+      <div class="weather-stat">
+        <div class="weather-stat-label">Connexion</div>
+        <div class="weather-stat-value">${esc(snapshot.connectivity.label)}</div>
+      </div>
+      <div class="weather-stat">
+        <div class="weather-stat-label">Source</div>
+        <div class="weather-stat-value">${esc(snapshot.connectivity.source)}</div>
+      </div>
+      <div class="weather-stat">
+        <div class="weather-stat-label">Stockage Dusk</div>
+        <div class="weather-stat-value">${esc(snapshot.storage.label)}</div>
+      </div>
+    </div>
+  `;
+}
 
 export const statsWidget = {
-  id:    'stats',
-  label: 'Système',
-  size:  'small',
+  id: 'stats',
+  label: 'Activité',
+  size: 'small',
 
   render(container) {
-    const cpu = rnd(10, 65), ram = rnd(40, 75), disk = rnd(30, 55);
+    const rows = buildActivityRows();
+
     container.innerHTML = `
       <div class="wc-fill" style="justify-content:center;gap:var(--space-2)">
-        ${[['CPU', cpu], ['RAM', ram], ['Disque', disk]].map(([label, val]) => `
-          <div class="sys-stat">
-            <div class="sys-stat-label"><span>${label}</span><span>${val}%</span></div>
-            <div class="sys-bar"><div class="sys-bar-fill" style="width:${val}%"></div></div>
-          </div>`).join('')}
+        ${renderRows(rows, false)}
       </div>`;
+    return null;
   },
 
   renderDetail(container) {
-    let iv;
+    let timer = null;
 
-    function render() {
-      const cpu  = rnd(10, 70), ram  = rnd(40, 80);
-      const disk = rnd(30, 60), net  = rnd(0, 30);
-      const uptime = '3j 14h 22min';
-      const temp   = rnd(45, 72);
+    function draw() {
+      const snapshot = buildActivitySnapshot();
+      const rows = buildActivityRows();
 
       container.innerHTML = `
-        <div style="max-width:560px;margin:0 auto">
-          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-4);margin-bottom:var(--space-6)">
-            <div class="weather-stat"><div class="weather-stat-label">Uptime</div><div class="weather-stat-value">${uptime}</div></div>
-            <div class="weather-stat"><div class="weather-stat-label">Température</div><div class="weather-stat-value">${temp}°C</div></div>
+        <div style="max-width:620px;margin:0 auto">
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:var(--space-6)">
+            <div>
+              <div style="font-family:var(--font-display);font-size:var(--text-2xl);color:var(--color-text)">Activité Dusk</div>
+              <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);margin-top:var(--space-1)">
+                ${esc(snapshot.widgets.active)} widgets actifs · ${esc(snapshot.todos.done)}/${esc(snapshot.todos.total)} todos · ${esc(snapshot.projects.active)}/${esc(snapshot.projects.total)} projets
+              </div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);text-align:right">
+              Actualisé il y a quelques instants
+            </div>
           </div>
-          <div class="detail-heading">Utilisation</div>
+
+          ${renderOverview(snapshot)}
+
+          <div class="detail-heading">Répartition</div>
           <div style="display:flex;flex-direction:column;gap:var(--space-4)">
-            ${[['CPU', cpu], ['Mémoire RAM', ram], ['Disque', disk], ['Réseau', net]].map(([label, val]) => `
-              <div class="sys-stat">
-                <div class="sys-stat-label"><span>${label}</span><span style="color:${val > 80 ? '#c84a4a' : val > 60 ? '#c8813c' : 'var(--color-text-muted)'}">${val}%</span></div>
-                <div class="sys-bar" style="height:6px">
-                  <div class="sys-bar-fill" style="width:${val}%;background:${val > 80 ? 'linear-gradient(to right,#c84a4a,#e06060)' : 'linear-gradient(to right,var(--color-amber),var(--color-amber-light))'}"></div>
-                </div>
-              </div>`).join('')}
+            ${renderRows(rows, true)}
           </div>
-          <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);text-align:right;margin-top:var(--space-4)">Mis à jour toutes les 3s</div>
+
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);margin-top:var(--space-6)">
+            <div class="weather-stat">
+              <div class="weather-stat-label">Widgets cachés</div>
+              <div class="weather-stat-value">${esc(snapshot.widgets.hidden)}</div>
+            </div>
+            <div class="weather-stat">
+              <div class="weather-stat-label">Todos restantes</div>
+              <div class="weather-stat-value">${esc(snapshot.todos.remaining)}</div>
+            </div>
+            <div class="weather-stat">
+              <div class="weather-stat-label">Projets terminés</div>
+              <div class="weather-stat-value">${esc(snapshot.projects.completed)}</div>
+            </div>
+          </div>
         </div>`;
     }
 
-    render();
-    iv = setInterval(render, 3000);
-    return () => clearInterval(iv);
+    draw();
+    timer = setInterval(draw, 30_000);
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   },
 };
