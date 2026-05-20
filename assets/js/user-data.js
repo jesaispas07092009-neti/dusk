@@ -1,5 +1,6 @@
-import { supabase, isSupabaseConfigured, wrapSupabaseError } from './supabase.js';
+import { supabase, isSupabaseConfigured } from './supabase.js';
 import { state } from './state.js';
+import { buildProfileStats } from './lib/metrics.js';
 
 const STORAGE_PREFIX = 'dusk-v2';
 
@@ -9,11 +10,7 @@ const DEFAULT_PROFILE = {
   role: 'Explorateur nocturne',
   bio: "Passionné par les interfaces belles et les expériences numériques qui ont de l'âme. Je construis des choses la nuit.",
   tags: ['Design', 'Code', 'Photographie', 'Musique', 'Architecture'],
-  stats: [
-    { label: 'Projets', value: '12' },
-    { label: 'Widgets', value: '23' },
-    { label: 'Jours', value: '∞' },
-  ],
+  stats: [],
 };
 
 const DEFAULT_LINKS = [
@@ -112,15 +109,23 @@ function persistFallbackState({ profile, todos, links, projects, widgetPrefs, mo
   if (moodLog) writeLocal('mood-log', userId, moodLog);
 }
 
-function throwIfSupabaseError(operation, error) {
-  if (error) throw wrapSupabaseError(operation, error);
+function withDerivedProfileStats(profile, { todos = [], projects = [], widgetPrefs = [], visibleWidgets = [] } = {}) {
+  return {
+    ...profile,
+    stats: buildProfileStats({
+      todos,
+      projects,
+      widgetPrefs,
+      visibleWidgets,
+    }),
+  };
 }
 
 export async function loadDashboardData({ userId = null, email = null } = {}) {
   const storageUserId = userId || 'anon';
 
   if (!isSupabaseConfigured || !supabase || !userId) {
-    const profile = normalizeProfile(readLocal('profile', storageUserId, null), userId, email);
+    let profile = normalizeProfile(readLocal('profile', storageUserId, null), userId, email);
     const todos = readLocal('todos', storageUserId, []);
     const links = (readLocal('links', storageUserId, DEFAULT_LINKS) || []).map((link, position) => ({
       ...link,
@@ -131,6 +136,7 @@ export async function loadDashboardData({ userId = null, email = null } = {}) {
     );
     const widgetPrefs = readLocal('widget-prefs', storageUserId, buildDefaultWidgetPrefs(storageUserId));
     const moodLog = readLocal('mood-log', storageUserId, []);
+    profile = withDerivedProfileStats(profile, { todos, projects, widgetPrefs });
     return { profile, todos, links, projects, widgetPrefs, moodLog, mood: moodLog[0] || null };
   }
 
@@ -169,12 +175,22 @@ export async function loadDashboardData({ userId = null, email = null } = {}) {
 
   const moodLog = (moodRes.data || []).map(entry => ({ ...entry }));
 
-  return { profile, todos, links, projects, widgetPrefs, moodLog, mood: moodLog[0] || null };
+  const derivedProfile = withDerivedProfileStats(profile, { todos, projects, widgetPrefs });
+
+  return { profile: derivedProfile, todos, links, projects, widgetPrefs, moodLog, mood: moodLog[0] || null };
 }
 
 export async function saveProfile(userId, patch) {
   const current = state.get('user.profile') || {};
-  const next = normalizeProfile({ ...current, ...patch }, userId, state.get('user.email'));
+  const next = withDerivedProfileStats(
+    normalizeProfile({ ...current, ...patch }, userId, state.get('user.email')),
+    {
+      todos: state.get('user.todos') || [],
+      projects: state.get('user.projects') || [],
+      widgetPrefs: state.get('user.widgetPrefs') || [],
+      visibleWidgets: state.get('widgets.visible') || [],
+    }
+  );
 
   if (!isSupabaseConfigured || !supabase || !userId) {
     persistFallbackState({ profile: next }, userId || 'anon');
@@ -192,7 +208,7 @@ export async function saveProfile(userId, patch) {
   };
 
   const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
-  throwIfSupabaseError('profiles.upsert', error);
+  if (error) throw error;
   return next;
 }
 
@@ -210,7 +226,7 @@ export async function saveWidgetPrefs(userId, prefs) {
   }));
 
   const { error } = await supabase.from('widget_prefs').upsert(rows, { onConflict: 'user_id,widget_id' });
-  throwIfSupabaseError('widget_prefs.upsert', error);
+  if (error) throw error;
   return prefs;
 }
 
@@ -229,7 +245,7 @@ export async function saveTodos(userId, todos) {
   }));
 
   const { error } = await supabase.from('todos').upsert(rows);
-  throwIfSupabaseError('todos.upsert', error);
+  if (error) throw error;
   return todos;
 }
 
@@ -249,7 +265,7 @@ export async function saveLinks(userId, links) {
   }));
 
   const { error } = await supabase.from('links').upsert(rows);
-  throwIfSupabaseError('links.upsert', error);
+  if (error) throw error;
   return links;
 }
 
@@ -270,19 +286,8 @@ export async function saveProjects(userId, projects) {
   }));
 
   const { error } = await supabase.from('projects').upsert(rows);
-  throwIfSupabaseError('projects.upsert', error);
+  if (error) throw error;
   return projects;
-}
-
-export async function deleteProject(userId, projectId) {
-  if (!isSupabaseConfigured || !supabase || !userId) {
-    const projects = readLocal('projects', userId || 'anon', []).filter(project => project.id !== projectId);
-    persistFallbackState({ projects }, userId || 'anon');
-    return projects;
-  }
-
-  const { error } = await supabase.from('projects').delete().eq('id', projectId).eq('user_id', userId);
-  throwIfSupabaseError('projects.delete', error);
 }
 
 export async function saveMood(userId, moodEntry) {
@@ -300,7 +305,7 @@ export async function saveMood(userId, moodEntry) {
   };
 
   const { error } = await supabase.from('mood_log').insert(payload);
-  throwIfSupabaseError('mood_log.insert', error);
+  if (error) throw error;
   return moodEntry;
 }
 
@@ -312,7 +317,7 @@ export async function deleteTodo(userId, todoId) {
   }
 
   const { error } = await supabase.from('todos').delete().eq('id', todoId).eq('user_id', userId);
-  throwIfSupabaseError('todos.delete', error);
+  if (error) throw error;
 }
 
 export async function upsertTodo(userId, todo) {
@@ -326,7 +331,15 @@ export async function upsertTodo(userId, todo) {
 }
 
 export function getDefaultProfile() {
-  return { ...DEFAULT_PROFILE };
+  return withDerivedProfileStats(
+    { ...DEFAULT_PROFILE },
+    {
+      todos: [],
+      projects: getDefaultProjects(),
+      widgetPrefs: buildDefaultWidgetPrefs('anon'),
+      visibleWidgets: [],
+    }
+  );
 }
 
 export function getDefaultLinks() {
