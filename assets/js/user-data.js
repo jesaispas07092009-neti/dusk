@@ -11,6 +11,7 @@ const DEFAULT_PROFILE = {
   bio: "Passionné par les interfaces belles et les expériences numériques qui ont de l'âme. Je construis des choses la nuit.",
   tags: ['Design', 'Code', 'Photographie', 'Musique', 'Architecture'],
   stats: [],
+  theme: 'dusk',   // thème persisté dans le profil
 };
 
 const DEFAULT_LINKS = [
@@ -73,40 +74,41 @@ function normalizeProfile(profile, fallbackUserId = null, email = null) {
   return {
     ...DEFAULT_PROFILE,
     ...profile,
-    tags: Array.isArray(profile.tags) ? profile.tags : DEFAULT_PROFILE.tags,
+    tags:  Array.isArray(profile.tags)  ? profile.tags  : DEFAULT_PROFILE.tags,
     stats: Array.isArray(profile.stats) ? profile.stats : DEFAULT_PROFILE.stats,
+    theme: profile.theme || DEFAULT_PROFILE.theme,
   };
 }
 
 function normalizeProject(project, position = 0, userId = null) {
   return {
-    id: project.id ?? `${userId}:project:${position}`,
-    user_id: project.user_id ?? userId,
-    name: project.name ?? '',
+    id:          project.id ?? `${userId}:project:${position}`,
+    user_id:     project.user_id ?? userId,
+    name:        project.name ?? '',
     description: project.description ?? project.desc ?? '',
-    status: project.status ?? 'concept',
-    color: project.color ?? '#c8813c',
-    position: Number.isFinite(project.position) ? project.position : position,
+    status:      project.status ?? 'concept',
+    color:       project.color ?? '#c8813c',
+    position:    Number.isFinite(project.position) ? project.position : position,
   };
 }
 
 function buildDefaultWidgetPrefs(userId) {
   return DEFAULT_WIDGET_IDS.map((widget_id, position) => ({
-    id: `${userId}:${widget_id}`,
-    user_id: userId,
+    id:       `${userId}:${widget_id}`,
+    user_id:  userId,
     widget_id,
-    enabled: true,
+    enabled:  true,
     position,
   }));
 }
 
 function persistFallbackState({ profile, todos, links, projects, widgetPrefs, moodLog } = {}, userId = 'anon') {
-  if (profile) writeLocal('profile', userId, profile);
-  if (todos) writeLocal('todos', userId, todos);
-  if (links) writeLocal('links', userId, links);
-  if (projects) writeLocal('projects', userId, projects);
-  if (widgetPrefs) writeLocal('widget-prefs', userId, widgetPrefs);
-  if (moodLog) writeLocal('mood-log', userId, moodLog);
+  if (profile)     writeLocal('profile',      userId, profile);
+  if (todos)       writeLocal('todos',         userId, todos);
+  if (links)       writeLocal('links',         userId, links);
+  if (projects)    writeLocal('projects',      userId, projects);
+  if (widgetPrefs) writeLocal('widget-prefs',  userId, widgetPrefs);
+  if (moodLog)     writeLocal('mood-log',      userId, moodLog);
 }
 
 function withDerivedProfileStats(profile, { todos = [], projects = [], widgetPrefs = [], visibleWidgets = [] } = {}) {
@@ -135,7 +137,7 @@ export async function loadDashboardData({ userId = null, email = null } = {}) {
       normalizeProject(project, position, storageUserId)
     );
     const widgetPrefs = readLocal('widget-prefs', storageUserId, buildDefaultWidgetPrefs(storageUserId));
-    const moodLog = readLocal('mood-log', storageUserId, []);
+    const moodLog     = readLocal('mood-log', storageUserId, []);
     profile = withDerivedProfileStats(profile, { todos, projects, widgetPrefs });
     return { profile, todos, links, projects, widgetPrefs, moodLog, mood: moodLog[0] || null };
   }
@@ -185,10 +187,10 @@ export async function saveProfile(userId, patch) {
   const next = withDerivedProfileStats(
     normalizeProfile({ ...current, ...patch }, userId, state.get('user.email')),
     {
-      todos: state.get('user.todos') || [],
-      projects: state.get('user.projects') || [],
-      widgetPrefs: state.get('user.widgetPrefs') || [],
-      visibleWidgets: state.get('widgets.visible') || [],
+      todos:          state.get('user.todos')       || [],
+      projects:       state.get('user.projects')    || [],
+      widgetPrefs:    state.get('user.widgetPrefs') || [],
+      visibleWidgets: state.get('widgets.visible')  || [],
     }
   );
 
@@ -198,13 +200,14 @@ export async function saveProfile(userId, patch) {
   }
 
   const payload = {
-    id: userId,
-    name: next.name,
+    id:       userId,
+    name:     next.name,
     initials: next.initials,
-    role: next.role,
-    bio: next.bio,
-    tags: next.tags,
-    stats: next.stats,
+    role:     next.role,
+    bio:      next.bio,
+    tags:     next.tags,
+    stats:    next.stats,
+    theme:    next.theme || 'dusk',   // ← persiste le thème dans Supabase
   };
 
   const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
@@ -219,10 +222,10 @@ export async function saveWidgetPrefs(userId, prefs) {
   }
 
   const rows = prefs.map(pref => ({
-    user_id: userId,
+    user_id:   userId,
     widget_id: pref.widget_id,
-    enabled: Boolean(pref.enabled),
-    position: Number(pref.position) || 0,
+    enabled:   Boolean(pref.enabled),
+    position:  Number(pref.position) || 0,
   }));
 
   const { error } = await supabase.from('widget_prefs').upsert(rows, { onConflict: 'user_id,widget_id' });
@@ -237,10 +240,10 @@ export async function saveTodos(userId, todos) {
   }
 
   const rows = todos.map((todo, index) => ({
-    id: isUuidLike(todo.id) ? todo.id : undefined,
-    user_id: userId,
-    text: todo.text,
-    done: Boolean(todo.done),
+    id:       isUuidLike(todo.id) ? todo.id : undefined,
+    user_id:  userId,
+    text:     todo.text,
+    done:     Boolean(todo.done),
     position: Number.isFinite(todo.position) ? todo.position : index,
   }));
 
@@ -256,11 +259,11 @@ export async function saveLinks(userId, links) {
   }
 
   const rows = links.map((link, index) => ({
-    id: isUuidLike(link.id) ? link.id : undefined,
-    user_id: userId,
-    label: link.label,
-    emoji: link.emoji,
-    url: link.url,
+    id:       isUuidLike(link.id) ? link.id : undefined,
+    user_id:  userId,
+    label:    link.label,
+    emoji:    link.emoji,
+    url:      link.url,
     position: Number.isFinite(link.position) ? link.position : index,
   }));
 
@@ -276,13 +279,13 @@ export async function saveProjects(userId, projects) {
   }
 
   const rows = projects.map((project, index) => ({
-    id: isUuidLike(project.id) ? project.id : undefined,
-    user_id: userId,
-    name: project.name,
+    id:          isUuidLike(project.id) ? project.id : undefined,
+    user_id:     userId,
+    name:        project.name,
     description: project.description ?? project.desc ?? '',
-    status: project.status,
-    color: project.color,
-    position: Number.isFinite(project.position) ? project.position : index,
+    status:      project.status,
+    color:       project.color,
+    position:    Number.isFinite(project.position) ? project.position : index,
   }));
 
   const { error } = await supabase.from('projects').upsert(rows);
@@ -314,9 +317,9 @@ export async function saveMood(userId, moodEntry) {
   }
 
   const payload = {
-    user_id: userId,
-    mood: moodEntry.mood,
-    note: moodEntry.note || '',
+    user_id:   userId,
+    mood:      moodEntry.mood,
+    note:      moodEntry.note || '',
     logged_at: moodEntry.logged_at || new Date().toISOString(),
   };
 
@@ -350,21 +353,16 @@ export function getDefaultProfile() {
   return withDerivedProfileStats(
     { ...DEFAULT_PROFILE },
     {
-      todos: [],
-      projects: getDefaultProjects(),
-      widgetPrefs: buildDefaultWidgetPrefs('anon'),
+      todos:          [],
+      projects:       getDefaultProjects(),
+      widgetPrefs:    buildDefaultWidgetPrefs('anon'),
       visibleWidgets: [],
     }
   );
 }
 
-export function getDefaultLinks() {
-  return DEFAULT_LINKS.map(item => ({ ...item }));
-}
-
-export function getDefaultProjects() {
-  return DEFAULT_PROJECTS.map(item => ({ ...item }));
-}
+export function getDefaultLinks()    { return DEFAULT_LINKS.map(item => ({ ...item })); }
+export function getDefaultProjects() { return DEFAULT_PROJECTS.map(item => ({ ...item })); }
 
 export function getDefaultWidgetPrefs(userId = 'anon') {
   return buildDefaultWidgetPrefs(userId);
