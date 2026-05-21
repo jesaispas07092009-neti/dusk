@@ -17,6 +17,7 @@ const defaultState = {
     projects: [],
     moodLog: [],
     mood: null,
+    worldmap: [],
   },
   modal: { isOpen: false, widgetId: null },
   widgets: { visible: [] },
