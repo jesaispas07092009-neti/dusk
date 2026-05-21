@@ -85,6 +85,12 @@ create table if not exists public.mood_log (
   logged_at  timestamptz not null default now()
 );
 
+create table if not exists public.worldmap (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  visited    text[] not null default '{}',
+  updated_at timestamptz not null default now()
+);
+
 -- ── Fonction admin ───────────────────────────────────────────
 
 create or replace function public.is_admin()
@@ -108,7 +114,8 @@ alter table public.widget_prefs   enable row level security;
 alter table public.todos          enable row level security;
 alter table public.links          enable row level security;
 alter table public.projects       enable row level security;
-alter table public.mood_log       enable row level security;
+alter table public.mood_log  enable row level security;
+alter table public.worldmap  enable row level security;
 
 -- Profiles : lecture propre (user = le sien, admin = tous)
 drop policy if exists "profiles_select_own"   on public.profiles;
@@ -157,6 +164,10 @@ drop policy if exists "mood_log_all" on public.mood_log;
 create policy "mood_log_all" on public.mood_log
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "worldmap_all" on public.worldmap;
+create policy "worldmap_all" on public.worldmap
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- ── Trigger : création automatique du profil à l'inscription ──
 
 create or replace function public.handle_new_user()
@@ -183,7 +194,7 @@ begin
     ('profile',10),('sunrise',11),('calendar',12),('quiz',13),
     ('tictactoe',14),('game2048',15),('reflex',16),('world-clock',17),
     ('links',18),('stats',19),('projects',20),('mood',21),
-    ('radio',22),('secret',23),('mystery',24)
+    ('radio',22),('secret',23),('mystery',24),('worldmap',25)
   ) as w(widget_id, pos)
   on conflict (user_id, widget_id) do nothing;
 
@@ -218,6 +229,10 @@ create trigger todos_updated_at before update on public.todos
 
 drop trigger if exists projects_updated_at on public.projects;
 create trigger projects_updated_at before update on public.projects
+  for each row execute procedure public.set_updated_at();
+
+drop trigger if exists worldmap_updated_at on public.worldmap;
+create trigger worldmap_updated_at before update on public.worldmap
   for each row execute procedure public.set_updated_at();
 
 -- ── Promouvoir le premier admin manuellement ─────────────────
