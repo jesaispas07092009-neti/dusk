@@ -35,7 +35,7 @@ const DEFAULT_WIDGET_IDS = [
   'clock', 'weather', 'quote', 'todo', 'moon', 'word', 'snake', 'compliment',
   'timer', 'memory', 'profile', 'sunrise', 'calendar', 'quiz', 'tictactoe',
   'game2048', 'reflex', 'world-clock', 'links', 'stats', 'projects', 'mood',
-  'radio', 'secret', 'mystery',
+  'radio', 'secret', 'mystery', 'worldmap',
 ];
 
 function storageKey(name, userId = 'anon') {
@@ -102,13 +102,14 @@ function buildDefaultWidgetPrefs(userId) {
   }));
 }
 
-function persistFallbackState({ profile, todos, links, projects, widgetPrefs, moodLog } = {}, userId = 'anon') {
-  if (profile)     writeLocal('profile',      userId, profile);
-  if (todos)       writeLocal('todos',         userId, todos);
-  if (links)       writeLocal('links',         userId, links);
-  if (projects)    writeLocal('projects',      userId, projects);
-  if (widgetPrefs) writeLocal('widget-prefs',  userId, widgetPrefs);
-  if (moodLog)     writeLocal('mood-log',      userId, moodLog);
+function persistFallbackState({ profile, todos, links, projects, widgetPrefs, moodLog, worldmap } = {}, userId = 'anon') {
+  if (profile)     writeLocal('profile',     userId, profile);
+  if (todos)       writeLocal('todos',        userId, todos);
+  if (links)       writeLocal('links',        userId, links);
+  if (projects)    writeLocal('projects',     userId, projects);
+  if (widgetPrefs) writeLocal('widget-prefs', userId, widgetPrefs);
+  if (moodLog)     writeLocal('mood-log',     userId, moodLog);
+  if (worldmap)    writeLocal('worldmap',     userId, worldmap);
 }
 
 function withDerivedProfileStats(profile, { todos = [], projects = [], widgetPrefs = [], visibleWidgets = [] } = {}) {
@@ -137,18 +138,20 @@ export async function loadDashboardData({ userId = null, email = null } = {}) {
       normalizeProject(project, position, storageUserId)
     );
     const widgetPrefs = readLocal('widget-prefs', storageUserId, buildDefaultWidgetPrefs(storageUserId));
-    const moodLog     = readLocal('mood-log', storageUserId, []);
+    const moodLog  = readLocal('mood-log', storageUserId, []);
+    const worldmap = readLocal('worldmap', storageUserId, []);
     profile = withDerivedProfileStats(profile, { todos, projects, widgetPrefs });
-    return { profile, todos, links, projects, widgetPrefs, moodLog, mood: moodLog[0] || null };
+    return { profile, todos, links, projects, widgetPrefs, moodLog, mood: moodLog[0] || null, worldmap };
   }
 
-  const [profileRes, prefsRes, todosRes, linksRes, projectsRes, moodRes] = await Promise.all([
+  const [profileRes, prefsRes, todosRes, linksRes, projectsRes, moodRes, worldmapRes] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
     supabase.from('widget_prefs').select('*').eq('user_id', userId).order('position', { ascending: true }),
     supabase.from('todos').select('*').eq('user_id', userId).order('position', { ascending: true }),
     supabase.from('links').select('*').eq('user_id', userId).order('position', { ascending: true }),
     supabase.from('projects').select('*').eq('user_id', userId).order('position', { ascending: true }),
     supabase.from('mood_log').select('*').eq('user_id', userId).order('logged_at', { ascending: false }).limit(20),
+    supabase.from('worldmap').select('visited').eq('user_id', userId).maybeSingle(),
   ]);
 
   const profile = normalizeProfile(profileRes.data, userId, email);
@@ -175,11 +178,12 @@ export async function loadDashboardData({ userId = null, email = null } = {}) {
     ...project,
   }))).map((project, position) => normalizeProject(project, position, userId));
 
-  const moodLog = (moodRes.data || []).map(entry => ({ ...entry }));
+  const moodLog  = (moodRes.data || []).map(entry => ({ ...entry }));
+  const worldmap = Array.isArray(worldmapRes.data?.visited) ? worldmapRes.data.visited : [];
 
   const derivedProfile = withDerivedProfileStats(profile, { todos, projects, widgetPrefs });
 
-  return { profile: derivedProfile, todos, links, projects, widgetPrefs, moodLog, mood: moodLog[0] || null };
+  return { profile: derivedProfile, todos, links, projects, widgetPrefs, moodLog, mood: moodLog[0] || null, worldmap };
 }
 
 export async function saveProfile(userId, patch) {
@@ -326,6 +330,19 @@ export async function saveMood(userId, moodEntry) {
   const { error } = await supabase.from('mood_log').insert(payload);
   if (error) throw error;
   return moodEntry;
+}
+
+export async function saveWorldMap(userId, visited) {
+  if (!isSupabaseConfigured || !supabase || !userId) {
+    persistFallbackState({ worldmap: visited }, userId || 'anon');
+    return visited;
+  }
+
+  const { error } = await supabase
+    .from('worldmap')
+    .upsert({ user_id: userId, visited }, { onConflict: 'user_id' });
+  if (error) throw error;
+  return visited;
 }
 
 export async function deleteTodo(userId, todoId) {
