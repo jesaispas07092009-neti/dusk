@@ -1,18 +1,19 @@
 /* ═══════════════════════════════════════════════════════════
    DUSK — grid.js
-   Construit la grille depuis le registre et applique les prefs user
+   Construit la grille depuis le registre et applique les prefs user.
+   Utilise motion-engine.js pour les animations de stagger.
 ═══════════════════════════════════════════════════════════ */
-import { state } from './state.js';
-import { openModal } from './modal.js';
+import { state }                              from './state.js';
+import { openModal }                          from './modal.js';
 import { getWidgetRegistry, WIDGET_REGISTRY_ALL } from './registry.js';
-import { esc } from './utils/escape.js';
+import { esc }                                from './utils/escape.js';
+import { staggerIn }                          from './motion-engine.js';
 
-const STAGGER_MS = 65;
 let gridBound = false;
 
 function getVisibleRegistry() {
   const registry = getWidgetRegistry();
-  const prefs = state.get('user.widgetPrefs') || [];
+  const prefs    = state.get('user.widgetPrefs') || [];
 
   if (!prefs.length) return registry;
 
@@ -75,7 +76,7 @@ function initWidgetClicks() {
   grid.addEventListener('click', e => {
     const widget = e.target.closest('.widget--expandable');
     if (!widget) return;
-    const id = widget.dataset.widgetId;
+    const id  = widget.dataset.widgetId;
     const def = WIDGET_REGISTRY_ALL.find(w => w.id === id);
     if (!def || typeof def.renderDetail !== 'function') return;
     openModal(id, def.label, def.renderDetail.bind(def));
@@ -99,12 +100,20 @@ export function renderGrid() {
   WIDGET_REGISTRY_ALL.forEach(cleanupWidget);
   grid.innerHTML = '';
 
-  widgets.forEach((widget, index) => {
+  // Construire tous les éléments d'abord
+  const elements = widgets.map(widget => {
     const el = buildWidgetEl(widget);
     grid.appendChild(el);
+    return { el, widget };
+  });
 
-    const delay = 120 + index * STAGGER_MS;
-    el.style.animationDelay = `${delay}ms`;
+  // Appliquer le stagger via motion-engine (calibré sur --motion-speed du thème actif)
+  const staggered = staggerIn(elements.map(e => e.el));
+
+  // Déclencher is-visible et render pour chaque widget
+  elements.forEach(({ el, widget }, index) => {
+    const { delay } = staggered[index];
+
     el.classList.add('is-visible');
 
     const bodyEl = el.querySelector('.widget-body');
@@ -117,6 +126,7 @@ export function renderGrid() {
       }
     }
 
+    // Marquer le widget comme visible dans le state après son animation
     setTimeout(() => {
       const visible = [...(state.get('widgets.visible') || []), widget.id].filter(Boolean);
       state.set('widgets.visible', [...new Set(visible)]);
