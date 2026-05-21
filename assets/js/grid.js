@@ -1,16 +1,20 @@
 /* ═══════════════════════════════════════════════════════════
    DUSK — grid.js
    Construit la grille depuis le registre et applique les prefs user.
-   Utilise motion-engine.js pour les animations de stagger.
+   - motion-engine.js pour le stagger d'apparition
+   - layout-engine.js pour le drag & drop
 ═══════════════════════════════════════════════════════════ */
-import { state }                              from './state.js';
-import { openModal }                          from './modal.js';
+import { state }                                 from './state.js';
+import { openModal }                             from './modal.js';
 import { getWidgetRegistry, WIDGET_REGISTRY_ALL } from './registry.js';
-import { esc }                                from './utils/escape.js';
-import { staggerIn }                          from './motion-engine.js';
+import { esc }                                   from './utils/escape.js';
+import { staggerIn }                             from './motion-engine.js';
+import { initLayoutEngine, destroyLayoutEngine } from './layout-engine.js';
 
-let gridBound = false;
+let gridBound   = false;
+let dragEnabled = false;
 
+/* ── Tri des widgets selon les prefs user ────────────────── */
 function getVisibleRegistry() {
   const registry = getWidgetRegistry();
   const prefs    = state.get('user.widgetPrefs') || [];
@@ -36,6 +40,7 @@ function cleanupWidget(widget) {
   widget._compactCleanup = null;
 }
 
+/* ── Construction du DOM d'un widget ─────────────────────── */
 function buildWidgetEl(widget) {
   const expandable = typeof widget.renderDetail === 'function' || widget.expandable !== false;
 
@@ -48,13 +53,22 @@ function buildWidgetEl(widget) {
   article.dataset.widgetId = widget.id;
   if (expandable) article.setAttribute('tabindex', '0');
   article.setAttribute('aria-label', `Widget ${esc(widget.label)}`);
+  article.setAttribute('aria-grabbed', 'false');
 
   article.innerHTML = `
     <div class="widget-inner">
       <header class="widget-header">
+        <span class="widget-drag-handle" aria-hidden="true" title="Déplacer">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9"  cy="5"  r="1"/><circle cx="15" cy="5"  r="1"/>
+            <circle cx="9"  cy="12" r="1"/><circle cx="15" cy="12" r="1"/>
+            <circle cx="9"  cy="19" r="1"/><circle cx="15" cy="19" r="1"/>
+          </svg>
+        </span>
         <span class="widget-label">${esc(widget.label)}</span>
         ${expandable ? `
-          <button class="widget-expand-btn" aria-label="Ouvrir en plein écran">
+          <button class="widget-expand-btn" aria-label="Ouvrir en plein écran" data-no-drag>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
@@ -68,12 +82,18 @@ function buildWidgetEl(widget) {
   return article;
 }
 
+/* ── Listeners de la grille (click + clavier) ────────────── */
 function initWidgetClicks() {
   const grid = document.getElementById('dusk-grid');
   if (!grid || gridBound) return;
   gridBound = true;
 
   grid.addEventListener('click', e => {
+    // Ne pas ouvrir la modale si on vient juste de finir un drag
+    if (grid.classList.contains('was-dragging')) {
+      grid.classList.remove('was-dragging');
+      return;
+    }
     const widget = e.target.closest('.widget--expandable');
     if (!widget) return;
     const id  = widget.dataset.widgetId;
@@ -91,26 +111,30 @@ function initWidgetClicks() {
   });
 }
 
+/* ── Rendu principal ─────────────────────────────────────── */
 export function renderGrid() {
   const grid = document.getElementById('dusk-grid');
   if (!grid) return;
 
   const widgets = getVisibleRegistry();
 
+  // Cleanup moteur de layout avant de reconstruire
+  destroyLayoutEngine();
+
   WIDGET_REGISTRY_ALL.forEach(cleanupWidget);
   grid.innerHTML = '';
 
-  // Construire tous les éléments d'abord
+  // Construire les éléments
   const elements = widgets.map(widget => {
     const el = buildWidgetEl(widget);
     grid.appendChild(el);
     return { el, widget };
   });
 
-  // Appliquer le stagger via motion-engine (calibré sur --motion-speed du thème actif)
+  // Stagger d'apparition calibré sur --motion-speed du thème
   const staggered = staggerIn(elements.map(e => e.el));
 
-  // Déclencher is-visible et render pour chaque widget
+  // Render + visibilité de chaque widget
   elements.forEach(({ el, widget }, index) => {
     const { delay } = staggered[index];
 
@@ -122,11 +146,11 @@ export function renderGrid() {
         widget._compactCleanup = widget.render(bodyEl, 'compact') || null;
       } catch (err) {
         console.warn(`[Dusk] Widget "${widget.id}" render error:`, err);
-        bodyEl.innerHTML = `<div class="wc-center" style="opacity:.4;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint)">— erreur —</div>`;
+        bodyEl.innerHTML = `<div class="wc-center" style="opacity:.4;font-family:var(--font-mono);
+          font-size:var(--text-xs);color:var(--color-text-faint)">— erreur —</div>`;
       }
     }
 
-    // Marquer le widget comme visible dans le state après son animation
     setTimeout(() => {
       const visible = [...(state.get('widgets.visible') || []), widget.id].filter(Boolean);
       state.set('widgets.visible', [...new Set(visible)]);
@@ -134,6 +158,34 @@ export function renderGrid() {
   });
 
   initWidgetClicks();
+
+  // (Re)activer le drag si c'était activé avant le re-render
+  if (dragEnabled) {
+    initLayoutEngine(grid);
+  }
+}
+
+/* ── Activation / désactivation du drag depuis settings ──── */
+
+/**
+ * Bascule le mode drag & drop.
+ * @param {boolean} enabled
+ */
+export function setGridDrag(enabled) {
+  const grid = document.getElementById('dusk-grid');
+  dragEnabled = enabled;
+
+  if (enabled) {
+    grid?.classList.add('drag-enabled');
+    if (grid) initLayoutEngine(grid);
+  } else {
+    grid?.classList.remove('drag-enabled');
+    destroyLayoutEngine();
+  }
+}
+
+export function isGridDragEnabled() {
+  return dragEnabled;
 }
 
 export function initGrid() {
