@@ -3,8 +3,12 @@
    Variables structurelles · Reset · Typographie · Ambiance globale
 
    NOTE : Les variables de couleur, d'atmosphère et d'accent
-   sont désormais dans themes.css. Ce fichier ne contient que
-   les variables invariantes (typo, spacing, radius, durées).
+   sont dans themes.css. Ce fichier ne contient que les variables
+   invariantes (typo, spacing, radius, durées brutes).
+
+   Les durées "motion-aware" (--dur-*-m) sont définies dans widgets.css
+   via calc(var(--duration-*) / var(--motion-speed)) et disponibles
+   globalement grâce à leur déclaration sur :root.
 ═══════════════════════════════════════════════════════════ */
 
 :root {
@@ -42,13 +46,14 @@
   --radius-lg: 20px;
   --radius-xl: 28px;
 
-  /* ── Easing & durées ──────────────────────────────────── */
+  /* ── Easing ───────────────────────────────────────────── */
   --ease-dusk:   cubic-bezier(0.25, 0.1, 0.25, 1);
   --ease-emerge: cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Les durées sont divisées par --motion-speed (défini dans themes.css).
-     Usage : calc(var(--duration-base) / var(--motion-speed))
-     On garde aussi les valeurs brutes pour les animations keyframe. */
+  /* ── Durées brutes (valeurs de référence) ─────────────── */
+  /* Les versions "motion-aware" (--dur-*-m) sont calculées dans
+     widgets.css : calc(var(--duration-*) / var(--motion-speed))
+     → Disponibles globalement via :root dans widgets.css       */
   --duration-fast:  150ms;
   --duration-base:  250ms;
   --duration-slow:  400ms;
@@ -59,6 +64,7 @@
 
   /* Fallback si themes.css n'a pas encore chargé */
   --header-bg-rgb: 15, 14, 13;
+  --motion-speed:  1;
 }
 
 /* ── Reset ────────────────────────────────────────────────── */
@@ -101,8 +107,8 @@ p { line-height: var(--leading-base); }
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
   background-size: 200px 200px;
-  /* Opacité pilotée par le thème */
   opacity: var(--grain-opacity, 0.022);
+  /* Transition douce quand le thème change (grain-opacity varie par thème) */
   transition: opacity 600ms var(--ease-dusk);
 }
 
@@ -112,7 +118,6 @@ p { line-height: var(--leading-base); }
   top: 0; left: 0; right: 0;
   z-index: 100;
   height: var(--header-height);
-  /* Background dynamique via --header-bg-rgb défini dans chaque thème */
   background: linear-gradient(
     to bottom,
     rgba(var(--header-bg-rgb), 0.95) 0%,
@@ -122,9 +127,10 @@ p { line-height: var(--leading-base); }
   -webkit-backdrop-filter: blur(var(--blur-intensity, 12px));
   border-bottom: 1px solid transparent;
   transition:
-    border-color  var(--duration-base) var(--ease-dusk),
-    backdrop-filter 600ms var(--ease-dusk);
-  animation: fade-up var(--duration-slow) var(--ease-emerge) both;
+    border-color    var(--dur-base-m, var(--duration-base)) var(--ease-dusk),
+    backdrop-filter 600ms var(--ease-dusk),
+    background      600ms var(--ease-dusk);
+  animation: fade-up var(--dur-slow-m, var(--duration-slow)) var(--ease-emerge) both;
 }
 .dusk-header.is-scrolled { border-bottom-color: var(--color-border); }
 
@@ -138,24 +144,31 @@ p { line-height: var(--leading-base); }
   justify-content: space-between;
 }
 .header-brand { display: flex; align-items: center; gap: var(--space-3); }
+
 .brand-dot {
   width: 7px; height: 7px;
   border-radius: 50%;
   background-color: var(--color-accent);
   box-shadow: 0 0 8px var(--color-accent);
   animation: pulse-accent 3s ease-in-out infinite;
-  transition: background-color 600ms var(--ease-dusk), box-shadow 600ms var(--ease-dusk);
+  transition:
+    background-color 600ms var(--ease-dusk),
+    box-shadow       600ms var(--ease-dusk);
 }
+
 @keyframes pulse-accent {
-  0%,100% { opacity:1; box-shadow: 0 0 8px var(--color-accent); }
-  50%      { opacity:0.6; box-shadow: 0 0 4px var(--color-accent); }
+  0%, 100% { opacity: 1;   box-shadow: 0 0 8px var(--color-accent); }
+  50%       { opacity: 0.6; box-shadow: 0 0 4px var(--color-accent); }
 }
+
 .brand-name {
   font-family: var(--font-display);
   font-size: var(--text-xl);
   letter-spacing: 0.01em;
 }
+
 .header-nav { display: flex; align-items: center; gap: var(--space-5); }
+
 .nav-time {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
@@ -163,14 +176,15 @@ p { line-height: var(--leading-base); }
   letter-spacing: 0.08em;
   min-width: 3.5ch;
 }
+
 .nav-btn {
   display: flex; align-items: center; justify-content: center;
   width: 32px; height: 32px;
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
   transition:
-    color            var(--duration-fast) var(--ease-dusk),
-    background-color var(--duration-fast) var(--ease-dusk);
+    color            var(--dur-fast-m, var(--duration-fast)) var(--ease-dusk),
+    background-color var(--dur-fast-m, var(--duration-fast)) var(--ease-dusk);
 }
 .nav-btn:hover { color: var(--color-text); background-color: var(--color-surface-2); }
 .nav-btn svg { width: 16px; height: 16px; stroke-width: 1.75; }
@@ -180,7 +194,12 @@ p { line-height: var(--leading-base); }
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.dusk-main { animation: fade-up var(--duration-slow) var(--ease-emerge) 80ms both; }
+
+/* Délai 80ms / motion-speed pour que le main suive le thème */
+.dusk-main {
+  animation: fade-up var(--dur-slow-m, var(--duration-slow)) var(--ease-emerge)
+             calc(80ms / var(--motion-speed, 1)) both;
+}
 
 /* ── Scrollbar ─────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
