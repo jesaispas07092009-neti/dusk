@@ -1,14 +1,18 @@
 /* ═══════════════════════════════════════════════════════════
    DUSK — main.js
 ═══════════════════════════════════════════════════════════ */
-import { initGrid, renderGrid }           from './grid.js';
-import { initModal }                      from './modal.js';
-import { state }                          from './state.js';
-import { bootstrapAuth, onAuthChange }    from './auth.js';
-import { openAuth }                       from './auth-ui.js';
-import { initSettings, refreshSettingsIfOpen } from './settings.js';
-import { loadDashboardData }              from './user-data.js';
-import { initThemeEngine, syncThemeFromProfile } from './theme-engine.js';
+import { initGrid, renderGrid }                   from './grid.js';
+import { initModal }                              from './modal.js';
+import { state }                                  from './state.js';
+import { bootstrapAuth, onAuthChange }            from './auth.js';
+import { openAuth }                               from './auth-ui.js';
+import { initSettings, refreshSettingsIfOpen }   from './settings.js';
+import { loadDashboardData }                      from './user-data.js';
+import { initThemeEngine, syncThemeFromProfile }  from './theme-engine.js';
+// motion-engine est importé ici pour s'assurer qu'il est chargé dès le départ.
+// Les modules qui l'utilisent (grid.js, modal.js) l'importent directement,
+// mais cet import garantit que --motion-speed est lisible dès bootstrap().
+import './motion-engine.js';
 
 let loadSeq = 0;
 
@@ -20,7 +24,8 @@ async function bootstrap() {
   initScrollHeader();
 
   /* Theme engine : applique le thème initial depuis localStorage
-     AVANT le rendu de la grille, pour éviter tout flash visuel. */
+     AVANT le rendu de la grille, pour éviter tout flash visuel.
+     Motion-engine lira ensuite --motion-speed depuis le thème appliqué. */
   initThemeEngine();
 
   const session = await bootstrapAuth();
