@@ -1,6 +1,11 @@
 /* ═══════════════════════════════════════════════════════════
    DUSK — modal.css
+   Les animations open/close sont désormais gérées par motion-engine.js
+   (animateModalOpen / animateModalClose) qui lit --motion-speed.
+   Ce fichier gère uniquement le layout, la visibilité, et les styles
+   statiques de la modale.
 ═══════════════════════════════════════════════════════════ */
+
 .dusk-modal {
   position: fixed;
   inset: 0;
@@ -10,7 +15,8 @@
   padding: var(--space-6);
   pointer-events: none;
   visibility: hidden;
-  transition: visibility 0s linear var(--duration-modal);
+  /* visibility se synchronise sur l'état JS (is-open), pas sur une transition CSS */
+  transition: visibility 0s linear var(--dur-modal-m, var(--duration-modal));
 }
 .dusk-modal.is-open {
   pointer-events: auto;
@@ -18,17 +24,18 @@
   transition-delay: 0s;
 }
 
+/* Backdrop — l'animation opacity est pilotée par motion-engine,
+   mais on garde l'état initial et les styles de fond ici */
 .modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(8,7,6,0.85);
+  background: rgba(8, 7, 6, 0.85);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  opacity: 0;
-  transition: opacity var(--duration-modal) var(--ease-dusk);
+  opacity: 0; /* état initial — motion-engine anime depuis là */
 }
-.dusk-modal.is-open .modal-backdrop { opacity: 1; }
 
+/* Container — état initial visible pour le layout, opacity pilotée par motion-engine */
 .modal-container {
   position: relative;
   width: 100%;
@@ -41,21 +48,25 @@
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-modal);
   overflow: hidden;
-  opacity: 0;
-  transform: translateY(20px) scale(0.97);
+  opacity: 0; /* état initial — motion-engine anime depuis là */
+  /* Transition thème pour les couleurs */
   transition:
-    opacity   var(--duration-modal) var(--ease-emerge),
-    transform var(--duration-modal) var(--ease-emerge);
+    background    600ms var(--ease-dusk),
+    border-color  600ms var(--ease-dusk),
+    box-shadow    600ms var(--ease-dusk);
 }
-.dusk-modal.is-open .modal-container { opacity: 1; transform: translateY(0) scale(1); }
+
+/* Ligne lumineuse en haut de la modale */
 .modal-container::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(to right, transparent, var(--color-amber-dim), transparent);
+  background: linear-gradient(to right, transparent, var(--color-accent-dim), transparent);
+  transition: background 600ms var(--ease-dusk);
 }
 
+/* ── Header de la modale ──────────────────────────────────── */
 .modal-header {
   display: flex;
   align-items: center;
@@ -75,11 +86,14 @@
   width: 32px; height: 32px;
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
-  transition: color var(--duration-fast) var(--ease-dusk), background-color var(--duration-fast) var(--ease-dusk);
+  transition:
+    color            var(--dur-fast-m, var(--duration-fast)) var(--ease-dusk),
+    background-color var(--dur-fast-m, var(--duration-fast)) var(--ease-dusk);
 }
 .modal-close-btn:hover { color: var(--color-text); background-color: var(--color-surface-3); }
 .modal-close-btn svg { width: 16px; height: 16px; stroke-width: 2; }
 
+/* ── Contenu de la modale ─────────────────────────────────── */
 .modal-content {
   flex: 1;
   overflow-y: auto;
@@ -88,13 +102,16 @@
 
 body.modal-open { overflow: hidden; }
 
+/* ── Mobile (bottom sheet) ────────────────────────────────── */
 @media (max-width: 767px) {
-  .dusk-modal { padding: 0; align-items: flex-end; }
+  .dusk-modal {
+    padding: 0;
+    align-items: flex-end;
+  }
   .modal-container {
     max-width: 100%;
     max-height: 90dvh;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    transform: translateY(100%);
+    /* Sur mobile, motion-engine anime depuis translateY(100%) */
   }
-  .dusk-modal.is-open .modal-container { transform: translateY(0); }
 }
