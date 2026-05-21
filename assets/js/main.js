@@ -65,6 +65,7 @@ async function loadAndApplyUserState(session) {
     state.set('user.projects',     []);
     state.set('user.moodLog',      []);
     state.set('user.mood',         null);
+    state.set('user.worldmap',     []);
     return;
   }
 
@@ -81,6 +82,7 @@ async function loadAndApplyUserState(session) {
   state.set('user.projects',    data.projects);
   state.set('user.moodLog',     data.moodLog);
   state.set('user.mood',        data.mood || null);
+  state.set('user.worldmap',    data.worldmap || []);
 }
 
 function initIcons() {
