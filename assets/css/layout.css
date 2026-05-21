@@ -1,6 +1,8 @@
 /* ═══════════════════════════════════════════════════════════
    DUSK — layout.css
+   Grille principale + styles drag & drop (layout-engine.js)
 ═══════════════════════════════════════════════════════════ */
+
 .dusk-main {
   position: relative;
   z-index: 1;
@@ -18,13 +20,70 @@
   grid-auto-flow: row dense;
 }
 
-/* Sizes */
+/* ── Tailles des widgets ────────────────────────────────── */
 .widget--small  { grid-column: span 3;  grid-row: span 2; }
 .widget--medium { grid-column: span 5;  grid-row: span 3; }
 .widget--large  { grid-column: span 7;  grid-row: span 4; }
 .widget--wide   { grid-column: span 12; grid-row: span 2; }
 .widget--tall   { grid-column: span 4;  grid-row: span 5; }
 
+/* ── Drag & Drop ────────────────────────────────────────── */
+
+/* Mode drag activé : curseur grab sur tous les widgets */
+#dusk-grid.drag-enabled .widget {
+  cursor: grab;
+}
+#dusk-grid.drag-enabled .widget:active {
+  cursor: grabbing;
+}
+
+/* Poignée de drag (6 dots) — visible uniquement en mode drag */
+.widget-drag-handle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: var(--space-2);
+  color: var(--color-text-faint);
+  cursor: grab;
+  flex-shrink: 0;
+  transition: color var(--dur-fast-m, var(--duration-fast)) var(--ease-dusk);
+}
+.widget-drag-handle svg {
+  width: 12px;
+  height: 12px;
+}
+.widget:hover .widget-drag-handle {
+  color: var(--color-text-muted);
+}
+
+/* Afficher la poignée seulement quand le drag est activé */
+#dusk-grid.drag-enabled .widget-drag-handle {
+  display: flex;
+}
+
+/* Widget en cours de drag — les styles de position sont injectés inline par layout-engine.js */
+.widget.is-dragging {
+  will-change: transform;
+  /* box-shadow élevé défini inline aussi, mais on prépare la var ici */
+  --shadow-drag: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--color-border-warm);
+}
+
+/* Ghost — placeholder dans la grille pendant le drag */
+.widget-drag-ghost {
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  border: 1.5px dashed var(--color-accent);
+  opacity: 0.35;
+  /* Hérite les grid-column/grid-row injectés par layout-engine.js */
+  pointer-events: none;
+  transition:
+    grid-column 180ms var(--ease-emerge),
+    grid-row    180ms var(--ease-emerge);
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 1199px) {
   #dusk-grid {
     grid-template-columns: repeat(8, 1fr);
@@ -55,6 +114,10 @@
   .widget--small  { grid-column: span 2; grid-row: span 2; }
   .widget--wide   { grid-column: span 4; grid-row: span 2; }
   .widget--tall   { grid-column: span 4; grid-row: span 4; }
+
+  /* Drag désactivé sur mobile (pas de pointeur précis) */
+  #dusk-grid.drag-enabled .widget { cursor: default; }
+  .widget-drag-handle { display: none !important; }
 }
 
 @media (max-width: 380px) {
