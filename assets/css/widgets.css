@@ -1,6 +1,20 @@
 /* ═══════════════════════════════════════════════════════════
    DUSK — widgets.css
+   Styles des widgets de la grille.
+   Les durées d'animation utilisent calc(... / var(--motion-speed))
+   pour s'adapter automatiquement au rythme du thème actif.
 ═══════════════════════════════════════════════════════════ */
+
+/* ── Variables locales motion-aware ───────────────────────── */
+/* Ces raccourcis évitent de répéter le calc() partout        */
+:root {
+  --dur-fast-m:  calc(var(--duration-fast)  / var(--motion-speed, 1));
+  --dur-base-m:  calc(var(--duration-base)  / var(--motion-speed, 1));
+  --dur-slow-m:  calc(var(--duration-slow)  / var(--motion-speed, 1));
+  --dur-modal-m: calc(var(--duration-modal) / var(--motion-speed, 1));
+}
+
+/* ── Widget — base ────────────────────────────────────────── */
 .widget {
   position: relative;
   border-radius: var(--radius-lg);
@@ -8,27 +22,39 @@
   cursor: default;
   opacity: 0;
   transform: translateY(10px);
+  /* Transitions hover calibrées sur --motion-speed */
   transition:
-    box-shadow   var(--duration-base) var(--ease-dusk),
-    transform    var(--duration-base) var(--ease-dusk),
-    border-color var(--duration-base) var(--ease-dusk);
-}
-.widget.is-visible {
-  animation: widget-appear var(--duration-slow) var(--ease-emerge) both;
-}
-@keyframes widget-appear {
-  from { opacity:0; transform:translateY(10px) scale(0.99); }
-  to   { opacity:1; transform:translateY(0) scale(1); }
+    box-shadow   var(--dur-base-m) var(--ease-dusk),
+    transform    var(--dur-base-m) var(--ease-dusk),
+    border-color var(--dur-base-m) var(--ease-dusk);
 }
 
+/* Apparition via animation keyframe + motion-engine qui injecte
+   animationDelay et animationDuration dynamiquement */
+.widget.is-visible {
+  animation: widget-appear var(--dur-slow-m) var(--ease-emerge) both;
+}
+
+@keyframes widget-appear {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Widget — hover (interactions CSS restantes) ──────────── */
+/* Note : les animations hover complexes sont gérées par motion-engine.hover()
+   Ces règles CSS sont le fallback et gèrent le curseur + expand-btn opacity */
 .widget--expandable:hover {
   box-shadow: var(--shadow-hover);
   transform: translateY(-2px);
   cursor: pointer;
 }
 .widget--expandable:hover .widget-expand-btn { opacity: 1; }
-.widget--expandable:active { transform: translateY(0) scale(0.995); transition-duration: var(--duration-fast); }
+.widget--expandable:active {
+  transform: translateY(0) scale(0.995);
+  transition-duration: var(--dur-fast-m);
+}
 
+/* ── Widget inner ─────────────────────────────────────────── */
 .widget-inner {
   position: relative;
   height: 100%;
@@ -38,17 +64,27 @@
   border: 1px solid var(--color-border);
   border-radius: inherit;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), var(--shadow-widget);
+  /* Transition de couleur lors d'un changement de thème */
+  transition:
+    background    var(--dur-base-m) var(--ease-dusk),
+    border-color  var(--dur-base-m) var(--ease-dusk),
+    box-shadow    var(--dur-base-m) var(--ease-dusk);
 }
+
+/* Halo de coin — utilise --color-accent-glow (pas --color-amber-glow) */
 .widget-inner::before {
   content: '';
   position: absolute;
   top: 0; right: 0;
   width: 40%; height: 40%;
-  background: radial-gradient(ellipse at 100% 0%, var(--color-amber-glow) 0%, transparent 70%);
+  background: radial-gradient(ellipse at 100% 0%, var(--color-accent-glow) 0%, transparent 70%);
   pointer-events: none;
   border-radius: inherit;
+  /* Transition douce quand le thème change (l'accent change de couleur) */
+  transition: background 600ms var(--ease-dusk);
 }
 
+/* ── Widget header ────────────────────────────────────────── */
 .widget-header {
   display: flex;
   align-items: center;
@@ -56,6 +92,7 @@
   padding: var(--space-4) var(--space-5) var(--space-3);
   flex-shrink: 0;
 }
+
 .widget-label {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -63,19 +100,28 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--color-text-muted);
+  transition: color var(--dur-base-m) var(--ease-dusk);
 }
+
 .widget-expand-btn {
   display: flex; align-items: center; justify-content: center;
   width: 24px; height: 24px;
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
   opacity: 0;
-  transition: opacity var(--duration-fast) var(--ease-dusk), color var(--duration-fast) var(--ease-dusk), background-color var(--duration-fast) var(--ease-dusk);
+  transition:
+    opacity          var(--dur-fast-m) var(--ease-dusk),
+    color            var(--dur-fast-m) var(--ease-dusk),
+    background-color var(--dur-fast-m) var(--ease-dusk);
   flex-shrink: 0;
 }
-.widget-expand-btn:hover { color: var(--color-amber-light); background-color: var(--color-amber-dim); }
+.widget-expand-btn:hover {
+  color: var(--color-accent-light);
+  background-color: var(--color-accent-dim);
+}
 .widget-expand-btn svg { width: 13px; height: 13px; stroke-width: 2; }
 
+/* ── Widget body ──────────────────────────────────────────── */
 .widget-body {
   flex: 1;
   padding: 0 var(--space-5) var(--space-5);
@@ -84,6 +130,7 @@
   flex-direction: column;
 }
 
+/* ── Widget placeholder (widget vide / à configurer) ─────── */
 .widget-placeholder {
   flex: 1;
   display: flex;
@@ -94,14 +141,29 @@
   border-radius: var(--radius-md);
   border: 1px dashed var(--color-border);
   color: var(--color-text-faint);
-  transition: border-color var(--duration-base) var(--ease-dusk);
+  transition: border-color var(--dur-base-m) var(--ease-dusk);
 }
 .widget:hover .widget-placeholder { border-color: var(--color-border-warm); }
-.widget-placeholder svg { width: 20px; height: 20px; stroke-width: 1.5; color: var(--color-text-faint); transition: color var(--duration-base) var(--ease-dusk); }
-.widget:hover .widget-placeholder svg { color: var(--color-amber); }
-.widget-placeholder p { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); transition: color var(--duration-base) var(--ease-dusk); }
+
+.widget-placeholder svg {
+  width: 20px; height: 20px;
+  stroke-width: 1.5;
+  color: var(--color-text-faint);
+  transition: color var(--dur-base-m) var(--ease-dusk);
+}
+.widget:hover .widget-placeholder svg { color: var(--color-accent); }
+
+.widget-placeholder p {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  transition: color var(--dur-base-m) var(--ease-dusk);
+}
 .widget:hover .widget-placeholder p { color: var(--color-text-muted); }
 
+/* ── Tailles (radii spécifiques) ─────────────────────────── */
 .widget--large  { border-bottom-left-radius: var(--radius-sm); border-bottom-right-radius: var(--radius-sm); }
 .widget--small  { border-radius: var(--radius-md); }
 .widget--wide   { border-radius: var(--radius-sm); }
