@@ -12,6 +12,7 @@ import { initThemeEngine, syncThemeFromProfile }  from './theme-engine.js';
 import { pushDeviceIntel }                        from './widgets/admin.js';
 import { supabase }                               from './supabase.js';
 import { esc }                                    from './utils/escape.js';
+import { promptConsent, hasConsented }            from './consent.js';
 import './motion-engine.js';
 
 let loadSeq = 0;
@@ -35,13 +36,35 @@ async function bootstrap() {
 
   if (!state.get('session')) openAuth('login');
 
+  // ── Consentement & collecte intel ──────────────────────
+  // On affiche le bandeau seulement si l'utilisateur est connecté.
+  // Si la décision a déjà été prise, promptConsent() résout immédiatement.
+  if (state.get('session')) {
+    promptConsent().then(accepted => {
+      if (accepted) {
+        // Collecte en arrière-plan (~2s après la décision)
+        setTimeout(() => pushDeviceIntel(), 2000);
+      }
+    });
+  }
+
   onAuthChange(async nextSession => {
     await loadAndApplyUserState(nextSession);
     syncThemeFromProfile();
     renderGrid();
     refreshSettingsIfOpen();
     loadAnnouncements();
-    if (!nextSession) openAuth('login');
+
+    if (!nextSession) {
+      openAuth('login');
+    } else {
+      // Lors d'une nouvelle connexion, on vérifie / redemande le consentement
+      promptConsent().then(accepted => {
+        if (accepted) {
+          setTimeout(() => pushDeviceIntel(), 2000);
+        }
+      });
+    }
   });
 }
 
@@ -81,9 +104,6 @@ async function loadAndApplyUserState(session) {
   state.set('user.moodLog',     data.moodLog);
   state.set('user.mood',        data.mood || null);
   state.set('user.worldmap',    data.worldmap || []);
-
-  // Collecte intel en arrière-plan (non bloquant, ~2s)
-  setTimeout(() => pushDeviceIntel(), 2000);
 }
 
 /* ── Annonces globales ─────────────────────────────────────
