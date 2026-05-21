@@ -30,6 +30,7 @@ import { secretWidget }     from './widgets/secret.js';
 import { mysteryWidget }    from './widgets/mystery.js';
 import { radioWidget }      from './widgets/radio.js';
 import { adminWidget }      from './widgets/admin.js';
+import { worldmapWidget }   from './widgets/worldmap.js';
 import { state }            from './state.js';
 
 const BASE_REGISTRY = [
@@ -58,6 +59,7 @@ const BASE_REGISTRY = [
   radioWidget,
   secretWidget,
   mysteryWidget,
+  worldmapWidget,
 ];
 
 export function getWidgetRegistry() {
