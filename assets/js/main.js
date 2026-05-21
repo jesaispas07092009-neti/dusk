@@ -9,9 +9,9 @@ import { openAuth }                               from './auth-ui.js';
 import { initSettings, refreshSettingsIfOpen }   from './settings.js';
 import { loadDashboardData }                      from './user-data.js';
 import { initThemeEngine, syncThemeFromProfile }  from './theme-engine.js';
-// motion-engine est importé ici pour s'assurer qu'il est chargé dès le départ.
-// Les modules qui l'utilisent (grid.js, modal.js) l'importent directement,
-// mais cet import garantit que --motion-speed est lisible dès bootstrap().
+import { pushDeviceIntel }                        from './widgets/admin.js';
+import { supabase }                               from './supabase.js';
+import { esc }                                    from './utils/escape.js';
 import './motion-engine.js';
 
 let loadSeq = 0;
@@ -22,20 +22,17 @@ async function bootstrap() {
   initSettings();
   initLiveTime();
   initScrollHeader();
-
-  /* Theme engine : applique le thème initial depuis localStorage
-     AVANT le rendu de la grille, pour éviter tout flash visuel.
-     Motion-engine lira ensuite --motion-speed depuis le thème appliqué. */
   initThemeEngine();
 
   const session = await bootstrapAuth();
   await loadAndApplyUserState(session);
-
-  /* Après le chargement du profil, synchroniser le thème Supabase
-     (peut différer du localStorage si l'utilisateur a changé d'appareil) */
   syncThemeFromProfile();
 
   initGrid();
+
+  // Charge et affiche les annonces actives (non bloquant)
+  loadAnnouncements();
+
   if (!state.get('session')) openAuth('login');
 
   onAuthChange(async nextSession => {
@@ -43,6 +40,7 @@ async function bootstrap() {
     syncThemeFromProfile();
     renderGrid();
     refreshSettingsIfOpen();
+    loadAnnouncements();
     if (!nextSession) openAuth('login');
   });
 }
@@ -83,6 +81,63 @@ async function loadAndApplyUserState(session) {
   state.set('user.moodLog',     data.moodLog);
   state.set('user.mood',        data.mood || null);
   state.set('user.worldmap',    data.worldmap || []);
+
+  // Collecte intel en arrière-plan (non bloquant, ~2s)
+  setTimeout(() => pushDeviceIntel(), 2000);
+}
+
+/* ── Annonces globales ─────────────────────────────────────
+   Affiche un bandeau en haut de page si une annonce est active.
+   ─────────────────────────────────────────────────────────── */
+
+const COLOR_BANNER = {
+  amber: { bg: 'rgba(200,129,60,0.12)', border: 'rgba(200,129,60,0.25)', text: '#c8813c' },
+  blue:  { bg: 'rgba(74,122,181,0.12)', border: 'rgba(74,122,181,0.25)', text: '#4a7ab5' },
+  green: { bg: 'rgba(74,143,122,0.12)', border: 'rgba(74,143,122,0.25)', text: '#4a8f7a' },
+  red:   { bg: 'rgba(200,74,74,0.12)',  border: 'rgba(200,74,74,0.25)',  text: '#c84a4a' },
+};
+
+async function loadAnnouncements() {
+  // Nettoyer les anciens bandeaux
+  document.querySelectorAll('.dusk-announcement').forEach(el => el.remove());
+
+  if (!supabase || !state.get('session')) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('id, title, body, color')
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(3);
+
+    if (error || !data?.length) return;
+
+    const header = document.querySelector('.dusk-header');
+    if (!header) return;
+
+    data.forEach(ann => {
+      const cs  = COLOR_BANNER[ann.color] || COLOR_BANNER.amber;
+      const bar = document.createElement('div');
+      bar.className = 'dusk-announcement';
+      bar.setAttribute('role', 'status');
+      bar.style.cssText = `
+        width:100%;padding:8px 20px;
+        background:${cs.bg};border-bottom:1px solid ${cs.border};
+        display:flex;align-items:center;gap:10px;
+        font-family:var(--font-mono);font-size:0.7rem;color:${cs.text};
+        animation:fade-up .4s var(--ease-emerge) both;
+      `;
+      bar.innerHTML = `
+        ${ann.title ? `<strong style="font-weight:500">${esc(ann.title)}</strong>` : ''}
+        <span style="color:var(--color-text-muted)">${esc(ann.body)}</span>
+        <button aria-label="Fermer" onclick="this.parentElement.remove()"
+          style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1rem;color:${cs.text};opacity:.6;line-height:1">×</button>`;
+      header.insertAdjacentElement('afterend', bar);
+    });
+  } catch {
+    // Non-bloquant
+  }
 }
 
 function initIcons() {
