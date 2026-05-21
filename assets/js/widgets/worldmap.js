@@ -4,9 +4,7 @@ import { saveWorldMap }    from '../user-data.js';
 import { persistMutation } from '../lib/persist.js';
 import { esc }             from '../utils/escape.js';
 
-/* ──────────────────────────────────────────────────────────
-   Table ISO-alpha2 → ID numérique world-atlas@2
-   ────────────────────────────────────────────────────────── */
+/* ── ISO-alpha2 → ID numérique world-atlas@2 ── */
 const ISO_TO_NUM = {
   AF:4,   AL:8,   DZ:12,  AS:16,  AD:20,  AO:24,  AG:28,  AR:32,
   AM:51,  AU:36,  AT:40,  AZ:31,  BS:44,  BH:48,  BD:50,  BB:52,
@@ -89,8 +87,8 @@ const COUNTRY_NAMES = {
   PH:'Philippines',    PL:'Pologne',         PT:'Portugal',
   QA:'Qatar',          RO:'Roumanie',        GB:'Royaume-Uni',
   RU:'Russie',         RW:'Rwanda',          LC:'Sainte-Lucie',
-  KN:'Saint-Kitts-et-Nevis', VC:'Saint-Vincent',
-  WS:'Samoa',          SM:'Saint-Marin',     ST:'São Tomé-et-Príncipe',
+  KN:'Saint-Kitts',    VC:'Saint-Vincent',   WS:'Samoa',
+  SM:'Saint-Marin',    ST:'São Tomé-et-Príncipe',
   SA:'Arabie Saoudite',SN:'Sénégal',         RS:'Serbie',
   SC:'Seychelles',     SL:'Sierra Leone',    SG:'Singapour',
   SK:'Slovaquie',      SI:'Slovénie',        SO:'Somalie',
@@ -108,97 +106,67 @@ const COUNTRY_NAMES = {
   KI:'Kiribati',       NC:'Nouvelle-Calédonie',
 };
 
-function countryName(iso) {
-  return COUNTRY_NAMES[iso] || iso;
-}
+function countryName(iso) { return COUNTRY_NAMES[iso] || iso; }
+function getVisited()     { return state.get('user.worldmap') || []; }
 
-function getVisited() {
-  return state.get('user.worldmap') || [];
-}
-
-/* ──────────────────────────────────────────────────────────
-   Vue compacte
-   ────────────────────────────────────────────────────────── */
+/* ── Vue compacte ── */
 function renderCompact(container) {
   const count = getVisited().length;
   container.innerHTML = `
     <div class="wc-center" style="flex-direction:column;gap:var(--space-3)">
       <svg viewBox="0 0 80 80" width="60" height="60">
         <circle cx="40" cy="40" r="35"
-          fill="var(--color-surface-2)"
-          stroke="var(--color-border-warm)" stroke-width="1"/>
+          fill="var(--color-surface-2)" stroke="var(--color-border-warm)" stroke-width="1"/>
         <ellipse cx="40" cy="40" rx="13" ry="35"
           fill="none" stroke="var(--color-border)" stroke-width="0.7"/>
         <ellipse cx="40" cy="40" rx="26" ry="35"
           fill="none" stroke="var(--color-border)" stroke-width="0.7"/>
-        <line x1="5" y1="40" x2="75" y2="40"
-          stroke="var(--color-border)" stroke-width="0.7"/>
-        <line x1="9" y1="27" x2="71" y2="27"
-          stroke="var(--color-border)" stroke-width="0.5" stroke-dasharray="2 2"/>
-        <line x1="9" y1="53" x2="71" y2="53"
-          stroke="var(--color-border)" stroke-width="0.5" stroke-dasharray="2 2"/>
+        <line x1="5" y1="40" x2="75" y2="40" stroke="var(--color-border)" stroke-width="0.7"/>
+        <line x1="9" y1="27" x2="71" y2="27" stroke="var(--color-border)" stroke-width="0.5" stroke-dasharray="2 2"/>
+        <line x1="9" y1="53" x2="71" y2="53" stroke="var(--color-border)" stroke-width="0.5" stroke-dasharray="2 2"/>
         ${count > 0 ? `<circle cx="40" cy="40" r="5" fill="var(--color-accent)" opacity="0.75"/>` : ''}
       </svg>
-      <div style="font-family:var(--font-display);font-size:var(--text-2xl);
-        color:var(--color-text);line-height:1">${count}</div>
-      <div style="font-family:var(--font-mono);font-size:var(--text-xs);
-        color:var(--color-text-faint)">pays visité${count !== 1 ? 's' : ''}</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-2xl);color:var(--color-text);line-height:1">${count}</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint)">
+        pays visité${count !== 1 ? 's' : ''}
+      </div>
     </div>`;
 }
 
-/* ──────────────────────────────────────────────────────────
-   Vue détail — SYNCHRONE (modal.js attend une valeur sync)
-   Le chargement async se fait à l'intérieur, après montage du DOM.
-   ────────────────────────────────────────────────────────── */
+/* ── Vue détail — SYNCHRONE (exigé par modal.js) ── */
 function renderDetail(container) {
-  /* ── Squelette immédiat (synchrone) ── */
   container.innerHTML = `
     <div id="wm-root" style="display:flex;flex-direction:column;height:100%;min-height:420px">
-      <div id="wm-header"
-        style="display:flex;align-items:center;justify-content:space-between;
-          margin-bottom:var(--space-4);flex-shrink:0;gap:var(--space-3)">
+      <div style="display:flex;align-items:center;justify-content:space-between;
+        margin-bottom:var(--space-4);flex-shrink:0;gap:var(--space-3)">
         <div>
-          <span id="wm-count"
-            style="font-family:var(--font-display);font-size:var(--text-xl);
-              color:var(--color-text)">—</span>
-          <span style="font-family:var(--font-mono);font-size:var(--text-xs);
-            color:var(--color-text-faint);margin-left:var(--space-2)">
-            pays visités
-          </span>
+          <span id="wm-count" style="font-family:var(--font-display);font-size:var(--text-xl);color:var(--color-text)">—</span>
+          <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint);margin-left:var(--space-2)">pays visités</span>
         </div>
         <div style="display:flex;align-items:center;gap:var(--space-3)">
-          <span id="wm-status"
-            style="font-family:var(--font-mono);font-size:var(--text-xs);
-              color:var(--color-text-faint)"></span>
-          <button id="wm-reset"
-            style="padding:var(--space-1) var(--space-3);
-              background:var(--color-surface-2);border:1px solid var(--color-border);
-              border-radius:var(--radius-sm);color:var(--color-text-muted);
-              font-family:var(--font-mono);font-size:var(--text-xs);cursor:pointer">
-            ↺ Reset vue
-          </button>
+          <span id="wm-status" style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-faint)"></span>
+          <button id="wm-reset" style="padding:var(--space-1) var(--space-3);
+            background:var(--color-surface-2);border:1px solid var(--color-border);
+            border-radius:var(--radius-sm);color:var(--color-text-muted);
+            font-family:var(--font-mono);font-size:var(--text-xs);cursor:pointer">↺ Reset vue</button>
         </div>
       </div>
 
       <div style="position:relative;flex:1;min-height:280px;
         border-radius:var(--radius-sm);overflow:hidden;
         background:var(--color-surface-2);border:1px solid var(--color-border)">
-        <canvas id="wm-canvas"
-          style="display:block;width:100%;height:100%;cursor:crosshair"></canvas>
-        <div id="wm-loader"
-          style="position:absolute;inset:0;display:flex;align-items:center;
-            justify-content:center;font-family:var(--font-mono);
-            font-size:var(--text-xs);color:var(--color-text-faint)">
+        <canvas id="wm-canvas" style="display:block;width:100%;height:100%;cursor:crosshair"></canvas>
+        <div id="wm-loader" style="position:absolute;inset:0;display:flex;align-items:center;
+          justify-content:center;font-family:var(--font-mono);font-size:var(--text-xs);
+          color:var(--color-text-faint);background:var(--color-surface-2)">
           Chargement de la carte…
         </div>
-        <div id="wm-tooltip"
-          style="position:absolute;pointer-events:none;opacity:0;
-            background:var(--color-surface-3);border:1px solid var(--color-border-warm);
-            border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);
-            font-family:var(--font-mono);font-size:var(--text-xs);
-            color:var(--color-text);white-space:nowrap;z-index:10;
-            box-shadow:0 4px 16px rgba(0,0,0,0.4);transition:opacity 0.12s">
-        </div>
+        <div id="wm-tooltip" style="position:absolute;pointer-events:none;opacity:0;
+          background:var(--color-surface-3);border:1px solid var(--color-border-warm);
+          border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);
+          font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text);
+          white-space:nowrap;z-index:10;box-shadow:0 4px 16px rgba(0,0,0,0.4);
+          transition:opacity 0.12s"></div>
       </div>
 
       <div style="margin-top:var(--space-3);flex-shrink:0">
@@ -206,24 +174,16 @@ function renderDetail(container) {
           color:var(--color-text-faint);margin-bottom:var(--space-2)">
           Clic pour marquer · Scroll pour zoomer · Glisser pour déplacer
         </div>
-        <div id="wm-list"
-          style="display:flex;flex-wrap:wrap;gap:var(--space-1);
-            max-height:76px;overflow-y:auto">
-        </div>
+        <div id="wm-list" style="display:flex;flex-wrap:wrap;gap:var(--space-1);max-height:76px;overflow-y:auto"></div>
       </div>
     </div>`;
 
-  /* ── Chargement async déclenché APRÈS que le DOM est en place ── */
+  /* Lance le chargement async APRÈS que le DOM est monté */
   initMap(container);
-
-  /* Pas de cleanup à retourner — ResizeObserver se nettoie seul
-     quand le canvas est déconnecté du DOM */
-  return null;
+  return null; /* modal.js attend null ou une fn de cleanup */
 }
 
-/* ──────────────────────────────────────────────────────────
-   Initialisation async de la carte (appelée après montage DOM)
-   ────────────────────────────────────────────────────────── */
+/* ── Initialisation async ── */
 async function initMap(container) {
   const canvas   = container.querySelector('#wm-canvas');
   const loader   = container.querySelector('#wm-loader');
@@ -231,33 +191,24 @@ async function initMap(container) {
   const countEl  = container.querySelector('#wm-count');
   const statusEl = container.querySelector('#wm-status');
   const listEl   = container.querySelector('#wm-list');
-
   if (!canvas) return;
 
-  /* ── Chargement dynamique des libs ── */
   let d3geo, topojson, world;
   try {
     [d3geo, topojson, world] = await Promise.all([
       import('https://cdn.jsdelivr.net/npm/d3-geo@3/+esm'),
       import('https://cdn.jsdelivr.net/npm/topojson-client@3/+esm'),
-      fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
-        .then(r => r.json()),
+      fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r => r.json()),
     ]);
   } catch {
-    if (loader) {
-      loader.textContent = 'Impossible de charger la carte (réseau requis).';
-      loader.style.color = '#c84a4a';
-    }
+    if (loader) { loader.textContent = 'Impossible de charger la carte (réseau requis).'; loader.style.color = '#c84a4a'; }
     return;
   }
 
-  /* Vérifier que le container est encore dans le DOM
-     (l'utilisateur a peut-être fermé la modale pendant le chargement) */
   if (!canvas.isConnected) return;
-
   if (loader) loader.style.display = 'none';
 
-  /* ── État local ── */
+  /* ── État ── */
   let visited    = [...getVisited()];
   let hoveredId  = null;
   let isDragging = false;
@@ -266,47 +217,36 @@ async function initMap(container) {
   let transform  = { x: 0, y: 0, k: 1 };
   let statusTimer = null;
 
-  /* ── Géométrie ── */
   const countries  = topojson.feature(world, world.objects.countries);
   const projection = d3geo.geoNaturalEarth1();
   const pathGen    = d3geo.geoPath().projection(projection);
   const sphere     = { type: 'Sphere' };
-
-  const ctx = canvas.getContext('2d');
+  const ctx        = canvas.getContext('2d');
   let W = 0, H = 0;
 
-  /* ── Resize — recalcule W/H et re-fit la projection ── */
+  /* ── Resize ── */
   function resize() {
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    const dpr  = window.devicePixelRatio || 1;
+    const dpr = window.devicePixelRatio || 1;
     W = rect.width;
     H = rect.height;
     canvas.width  = W * dpr;
     canvas.height = H * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // reset + scale DPR propre
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     projection.fitSize([W, H], sphere);
     draw();
   }
-
-  const ro = new ResizeObserver(() => {
-    if (canvas.isConnected) resize();
-  });
+  const ro = new ResizeObserver(() => { if (canvas.isConnected) resize(); });
   ro.observe(canvas);
 
-  /* ── Couleurs CSS ── */
-  function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  }
+  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
   /* ── Dessin ── */
   function draw() {
     if (!W || !H) return;
-    const dpr = window.devicePixelRatio || 1;
-
     ctx.save();
-    ctx.clearRect(0, 0, W, H); // coordonnées CSS — ctx est déjà scalé DPR
-
+    ctx.clearRect(0, 0, W, H);
     ctx.translate(transform.x, transform.y);
     ctx.scale(transform.k, transform.k);
 
@@ -315,189 +255,126 @@ async function initMap(container) {
     const colLand    = cssVar('--color-surface-3') || '#2a2622';
     const colBorder  = cssVar('--color-border')    || 'rgba(255,255,255,0.06)';
     const colAccent  = cssVar('--color-accent')    || '#c8813c';
-    const colHover   = '#35302b';
 
-    /* Océan */
-    ctx.beginPath();
-    pathGen.context(ctx)(sphere);
-    ctx.fillStyle = colOcean;
-    ctx.fill();
+    ctx.beginPath(); pathGen.context(ctx)(sphere);
+    ctx.fillStyle = colOcean; ctx.fill();
 
-    /* Pays */
     for (const f of countries.features) {
       const numId     = Number(f.id);
       const iso       = NUM_TO_ISO[numId];
       const isVisited = iso && visitedSet.has(iso);
       const isHovered = numId === hoveredId;
-
-      ctx.beginPath();
-      pathGen.context(ctx)(f);
-
-      if (isVisited) {
-        ctx.fillStyle = isHovered ? colAccent : colAccent + 'aa';
-      } else {
-        ctx.fillStyle = isHovered ? colHover : colLand;
-      }
+      ctx.beginPath(); pathGen.context(ctx)(f);
+      ctx.fillStyle   = isVisited ? (isHovered ? colAccent : colAccent + 'aa') : (isHovered ? '#35302b' : colLand);
       ctx.fill();
-      ctx.strokeStyle = colBorder;
-      ctx.lineWidth   = 0.5 / transform.k;
-      ctx.stroke();
+      ctx.strokeStyle = colBorder; ctx.lineWidth = 0.5 / transform.k; ctx.stroke();
     }
 
-    /* Contour sphère */
-    ctx.beginPath();
-    pathGen.context(ctx)(sphere);
-    ctx.strokeStyle = colBorder;
-    ctx.lineWidth   = 1 / transform.k;
-    ctx.stroke();
-
+    ctx.beginPath(); pathGen.context(ctx)(sphere);
+    ctx.strokeStyle = colBorder; ctx.lineWidth = 1 / transform.k; ctx.stroke();
     ctx.restore();
   }
 
-  /* ── Hit test — coordonnées CSS pures, pas de DPR ── */
+  /* ── Hit test via projection.invert() + d3.geoContains() ──
+     On convertit le pixel CSS cliqué en [lon, lat] via l'inverse de la
+     projection (en tenant compte du pan/zoom), puis on teste géographiquement
+     quel pays contient ce point. Aucun problème de DPR, aucun canvas offscreen. */
   function getFeatureAt(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
-    // On travaille en espace CSS (W×H), cohérent avec pathGen qui ignore le DPR
-    const mx = (clientX - rect.left  - transform.x) / transform.k;
-    const my = (clientY - rect.top   - transform.y) / transform.k;
-
-    // Créer un canvas offscreen CSS 1×1 pour le hit test — évite le problème DPR
-    const hit = document.createElement('canvas');
-    hit.width  = W;
-    hit.height = H;
-    const hctx = hit.getContext('2d');
-    hctx.translate(transform.x, transform.y);
-    hctx.scale(transform.k, transform.k);
+    // coordonnées CSS → espace projection (annule pan+zoom)
+    const px = (clientX - rect.left - transform.x) / transform.k;
+    const py = (clientY - rect.top  - transform.y) / transform.k;
+    // projection.invert : pixels CSS → [longitude, latitude]
+    const lonLat = projection.invert([px, py]);
+    if (!lonLat) return null;
 
     for (const f of countries.features) {
-      hctx.beginPath();
-      pathGen.context(hctx)(f);
-      if (hctx.isPointInPath(clientX - rect.left, clientY - rect.top)) return f;
+      if (d3geo.geoContains(f, lonLat)) return f;
     }
     return null;
   }
 
-  /* ── Tooltip ── */
+  /* ── UI helpers ── */
   function showTooltip(x, y, text) {
     if (!tooltip) return;
     tooltip.textContent = text;
-    tooltip.style.left    = (x + 14) + 'px';
-    tooltip.style.top     = (y - 10) + 'px';
+    tooltip.style.left = (x + 14) + 'px';
+    tooltip.style.top  = (y - 10) + 'px';
     tooltip.style.opacity = '1';
   }
-  function hideTooltip() {
-    if (tooltip) tooltip.style.opacity = '0';
-  }
+  function hideTooltip() { if (tooltip) tooltip.style.opacity = '0'; }
 
-  /* ── Statut ── */
   function setStatus(msg, error = false, autoClear = false) {
     if (!statusEl) return;
     statusEl.textContent = msg;
     statusEl.style.color = error ? '#c84a4a' : 'var(--color-text-faint)';
     if (statusTimer) { clearTimeout(statusTimer); statusTimer = null; }
     if (autoClear && msg) {
-      statusTimer = setTimeout(() => {
-        if (statusEl.isConnected) statusEl.textContent = '';
-      }, 2200);
+      statusTimer = setTimeout(() => { if (statusEl.isConnected) statusEl.textContent = ''; }, 2200);
     }
   }
 
-  /* ── Liste des pays visités ── */
   function updateList() {
     if (countEl) countEl.textContent = visited.length;
     if (!listEl) return;
     listEl.innerHTML = visited.map(iso => `
-      <span data-rm="${esc(iso)}"
-        style="display:inline-flex;align-items:center;gap:3px;
-          padding:2px 8px 2px 10px;border-radius:999px;cursor:pointer;
-          background:var(--color-accent-dim);border:1px solid var(--color-border-warm);
-          font-family:var(--font-mono);font-size:10px;color:var(--color-accent-light)">
-        ${esc(countryName(iso))}
-        <span style="opacity:0.5">×</span>
+      <span data-rm="${esc(iso)}" style="display:inline-flex;align-items:center;gap:3px;
+        padding:2px 8px 2px 10px;border-radius:999px;cursor:pointer;
+        background:var(--color-accent-dim);border:1px solid var(--color-border-warm);
+        font-family:var(--font-mono);font-size:10px;color:var(--color-accent-light)">
+        ${esc(countryName(iso))}<span style="opacity:0.5">×</span>
       </span>`).join('');
-
     listEl.querySelectorAll('[data-rm]').forEach(el => {
-      el.addEventListener('click', e => {
-        e.stopPropagation();
-        toggleCountry(el.dataset.rm, false);
-      });
+      el.addEventListener('click', e => { e.stopPropagation(); toggleCountry(el.dataset.rm, false); });
     });
   }
 
   /* ── Toggle pays ── */
   async function toggleCountry(iso, forceAdd = null) {
     const nowVisited = forceAdd !== null ? forceAdd : !visited.includes(iso);
-    const snapshot   = [...visited]; // copie pour rollback
+    const snapshot   = [...visited];
 
-    if (nowVisited) {
-      if (!visited.includes(iso)) visited.push(iso);
-    } else {
-      visited = visited.filter(v => v !== iso);
-    }
+    if (nowVisited) { if (!visited.includes(iso)) visited.push(iso); }
+    else            { visited = visited.filter(v => v !== iso); }
 
-    state.set('user.worldmap', [...visited]); // copie défensive
+    state.set('user.worldmap', [...visited]);
     setStatus('Sauvegarde…');
-    draw();
-    updateList();
+    draw(); updateList();
 
     try {
       await persistMutation({
         action:   () => saveWorldMap(state.get('user.id'), [...visited]),
-        rollback: () => {
-          visited = snapshot;
-          state.set('user.worldmap', [...snapshot]);
-        },
+        rollback: () => { visited = snapshot; state.set('user.worldmap', [...snapshot]); },
         errorMessage: 'Impossible de sauvegarder la carte.',
       });
-      setStatus(
-        nowVisited ? `✓ ${countryName(iso)} ajouté` : `${countryName(iso)} retiré`,
-        false, true
-      );
-      draw();
-      updateList();
+      setStatus(nowVisited ? `✓ ${countryName(iso)} ajouté` : `${countryName(iso)} retiré`, false, true);
+      draw(); updateList();
     } catch {
       setStatus('Erreur de sauvegarde', true);
-      draw();
-      updateList();
+      draw(); updateList();
     }
   }
 
-  /* ── Souris ── */
+  /* ── Événements ── */
   canvas.addEventListener('mousemove', e => {
     if (isDragging) {
       transform.x = panStart.x + (e.clientX - dragStart.x);
       transform.y = panStart.y + (e.clientY - dragStart.y);
-      hideTooltip();
-      draw();
-      return;
+      hideTooltip(); draw(); return;
     }
-
     const f     = getFeatureAt(e.clientX, e.clientY);
     const numId = f ? Number(f.id) : null;
-
     if (numId !== hoveredId) { hoveredId = numId; draw(); }
-
     if (f) {
       const iso  = NUM_TO_ISO[Number(f.id)];
       const rect = canvas.getBoundingClientRect();
-      showTooltip(
-        e.clientX - rect.left,
-        e.clientY - rect.top,
-        `${iso ? countryName(iso) : '—'}${iso && visited.includes(iso) ? ' ✓' : ''}`
-      );
+      showTooltip(e.clientX - rect.left, e.clientY - rect.top,
+        `${iso ? countryName(iso) : '—'}${iso && visited.includes(iso) ? ' ✓' : ''}`);
       canvas.style.cursor = 'pointer';
-    } else {
-      hideTooltip();
-      canvas.style.cursor = 'crosshair';
-    }
+    } else { hideTooltip(); canvas.style.cursor = 'crosshair'; }
   });
 
-  canvas.addEventListener('mouseleave', () => {
-    hoveredId  = null;
-    isDragging = false;
-    hideTooltip();
-    draw();
-  });
+  canvas.addEventListener('mouseleave', () => { hoveredId = null; isDragging = false; hideTooltip(); draw(); });
 
   canvas.addEventListener('mousedown', e => {
     isDragging = true;
@@ -507,13 +384,9 @@ async function initMap(container) {
   });
 
   canvas.addEventListener('mouseup', async e => {
-    const moved = dragStart
-      ? Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) > 4
-      : false;
-    isDragging = false;
-    canvas.style.cursor = 'crosshair';
+    const moved = dragStart ? Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) > 4 : false;
+    isDragging = false; canvas.style.cursor = 'crosshair';
     if (moved) return;
-
     const f   = getFeatureAt(e.clientX, e.clientY);
     const iso = f ? NUM_TO_ISO[Number(f.id)] : null;
     if (iso) await toggleCountry(iso);
@@ -522,14 +395,9 @@ async function initMap(container) {
   /* Touch */
   let touchRef = null;
   canvas.addEventListener('touchstart', e => {
-    if (e.touches.length === 1) {
-      touchRef = {
-        x: e.touches[0].clientX, y: e.touches[0].clientY,
-        px: transform.x, py: transform.y,
-      };
-    }
+    if (e.touches.length === 1)
+      touchRef = { x: e.touches[0].clientX, y: e.touches[0].clientY, px: transform.x, py: transform.y };
   }, { passive: true });
-
   canvas.addEventListener('touchmove', e => {
     if (e.touches.length === 1 && touchRef) {
       transform.x = touchRef.px + e.touches[0].clientX - touchRef.x;
@@ -537,20 +405,15 @@ async function initMap(container) {
       draw();
     }
   }, { passive: true });
-
   canvas.addEventListener('touchend', async e => {
-    const t     = e.changedTouches[0];
-    const moved = touchRef
-      ? Math.hypot(t.clientX - touchRef.x, t.clientY - touchRef.y) > 6
-      : false;
-    touchRef = null;
-    if (moved) return;
+    const t = e.changedTouches[0];
+    const moved = touchRef ? Math.hypot(t.clientX - touchRef.x, t.clientY - touchRef.y) > 6 : false;
+    touchRef = null; if (moved) return;
     const f   = getFeatureAt(t.clientX, t.clientY);
     const iso = f ? NUM_TO_ISO[Number(f.id)] : null;
     if (iso) await toggleCountry(iso);
   }, { passive: true });
 
-  /* Zoom */
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     const rect   = canvas.getBoundingClientRect();
@@ -560,38 +423,22 @@ async function initMap(container) {
     const newK   = Math.min(Math.max(transform.k * factor, 0.5), 14);
     transform.x  = mx - (mx - transform.x) * (newK / transform.k);
     transform.y  = my - (my - transform.y) * (newK / transform.k);
-    transform.k  = newK;
-    draw();
+    transform.k  = newK; draw();
   }, { passive: false });
 
-  /* Reset vue */
   container.querySelector('#wm-reset')?.addEventListener('click', () => {
     transform = { x: 0, y: 0, k: 1 };
-    projection.fitSize([W, H], sphere);
-    draw();
+    projection.fitSize([W, H], sphere); draw();
   });
 
-  /* Init */
   updateList();
-  /* resize() est appelé par ResizeObserver dès que le canvas a des dimensions */
 }
 
-/* ──────────────────────────────────────────────────────────
-   Export
-   ────────────────────────────────────────────────────────── */
+/* ── Export ── */
 export const worldmapWidget = {
   id:    'worldmap',
   label: 'Carte du monde',
   size:  'small',
-
-  render(container) {
-    renderCompact(container);
-  },
-
-  /* IMPORTANT : renderDetail doit être SYNCHRONE pour modal.js
-     (qui fait cleanupFn = renderDetailFn(contentEl) || null)
-     Le chargement async se fait dans initMap() après montage DOM. */
-  renderDetail(container) {
-    return renderDetail(container); // retourne null
-  },
+  render(container)       { renderCompact(container); },
+  renderDetail(container) { return renderDetail(container); },
 };
