@@ -6,7 +6,6 @@
 ═══════════════════════════════════════════════════════════ */
 
 /* ── Variables locales motion-aware ───────────────────────── */
-/* Ces raccourcis évitent de répéter le calc() partout        */
 :root {
   --dur-fast-m:  calc(var(--duration-fast)  / var(--motion-speed, 1));
   --dur-base-m:  calc(var(--duration-base)  / var(--motion-speed, 1));
@@ -22,15 +21,12 @@
   cursor: default;
   opacity: 0;
   transform: translateY(10px);
-  /* Transitions hover calibrées sur --motion-speed */
   transition:
     box-shadow   var(--dur-base-m) var(--ease-dusk),
     transform    var(--dur-base-m) var(--ease-dusk),
     border-color var(--dur-base-m) var(--ease-dusk);
 }
 
-/* Apparition via animation keyframe + motion-engine qui injecte
-   animationDelay et animationDuration dynamiquement */
 .widget.is-visible {
   animation: widget-appear var(--dur-slow-m) var(--ease-emerge) both;
 }
@@ -40,9 +36,7 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ── Widget — hover (interactions CSS restantes) ──────────── */
-/* Note : les animations hover complexes sont gérées par motion-engine.hover()
-   Ces règles CSS sont le fallback et gèrent le curseur + expand-btn opacity */
+/* ── Widget — hover ───────────────────────────────────────── */
 .widget--expandable:hover {
   box-shadow: var(--shadow-hover);
   transform: translateY(-2px);
@@ -52,6 +46,13 @@
 .widget--expandable:active {
   transform: translateY(0) scale(0.995);
   transition-duration: var(--dur-fast-m);
+}
+
+/* En mode drag-enabled, le hover ne lève plus les widgets
+   pour ne pas confondre drag et expand */
+#dusk-grid.drag-enabled .widget--expandable:hover {
+  transform: none;
+  box-shadow: var(--shadow-widget);
 }
 
 /* ── Widget inner ─────────────────────────────────────────── */
@@ -64,14 +65,13 @@
   border: 1px solid var(--color-border);
   border-radius: inherit;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), var(--shadow-widget);
-  /* Transition de couleur lors d'un changement de thème */
   transition:
-    background    var(--dur-base-m) var(--ease-dusk),
-    border-color  var(--dur-base-m) var(--ease-dusk),
-    box-shadow    var(--dur-base-m) var(--ease-dusk);
+    background   var(--dur-base-m) var(--ease-dusk),
+    border-color var(--dur-base-m) var(--ease-dusk),
+    box-shadow   var(--dur-base-m) var(--ease-dusk);
 }
 
-/* Halo de coin — utilise --color-accent-glow (pas --color-amber-glow) */
+/* Halo de coin — utilise --color-accent-glow */
 .widget-inner::before {
   content: '';
   position: absolute;
@@ -80,7 +80,6 @@
   background: radial-gradient(ellipse at 100% 0%, var(--color-accent-glow) 0%, transparent 70%);
   pointer-events: none;
   border-radius: inherit;
-  /* Transition douce quand le thème change (l'accent change de couleur) */
   transition: background 600ms var(--ease-dusk);
 }
 
@@ -91,6 +90,7 @@
   justify-content: space-between;
   padding: var(--space-4) var(--space-5) var(--space-3);
   flex-shrink: 0;
+  gap: var(--space-2);
 }
 
 .widget-label {
@@ -101,6 +101,11 @@
   text-transform: uppercase;
   color: var(--color-text-muted);
   transition: color var(--dur-base-m) var(--ease-dusk);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .widget-expand-btn {
@@ -130,7 +135,7 @@
   flex-direction: column;
 }
 
-/* ── Widget placeholder (widget vide / à configurer) ─────── */
+/* ── Widget placeholder ───────────────────────────────────── */
 .widget-placeholder {
   flex: 1;
   display: flex;
